@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Empresa — Véndelo Ya</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2316181D'/><text x='50' y='68' font-size='52' font-family='Archivo,sans-serif' font-weight='800' fill='white' text-anchor='middle'>V</text></svg>">
+</head>
+<body>
+
+<div class="adm">
+  <aside class="side">
+    <a class="side-brand" href="index.html">
+      <span class="side-logo">VY</span>
+      <span class="side-brand-txt"><b>Véndelo Ya</b><small>Panel de compras</small></span>
+    </a>
+    <p class="tag">Menú</p>
+    <button class="nav" data-v="dash">
+      <svg class="ic"><use href="#i-clock"/></svg><span class="nav-lbl">Resumen</span><span class="nav-count" data-count="dash"></span>
+    </button>
+    <button class="nav" data-v="cola">
+      <svg class="ic"><use href="#i-doc"/></svg><span class="nav-lbl">Solicitudes</span><span class="nav-count" data-count="cola"></span>
+    </button>
+    <button class="nav" data-v="showroom">
+      <svg class="ic"><use href="#i-star"/></svg><span class="nav-lbl">Showroom</span><span class="nav-count" data-count="showroom"></span>
+    </button>
+    <button class="nav" data-v="citas">
+      <svg class="ic"><use href="#i-cal"/></svg><span class="nav-lbl">Citas</span><span class="nav-count" data-count="citas"></span>
+    </button>
+    <button class="nav" data-v="talleres">
+      <svg class="ic"><use href="#i-gear"/></svg><span class="nav-lbl">Talleres</span><span class="nav-count" data-count="talleres"></span>
+    </button>
+    <button class="nav" data-v="usuarios">
+      <svg class="ic"><use href="#i-user"/></svg><span class="nav-lbl">Usuarios</span><span class="nav-count" data-count="usuarios"></span>
+    </button>
+    <div class="foot-slot">
+      <a href="index.html">
+        <svg class="ic"><use href="#i-arrow" /></svg>Ver sitio público
+      </a>
+      <p class="side-help">Cada auto avanza por etapas — el pago al cliente se libera solo al completarse el traspaso legal.</p>
+      <p class="side-credit">Desarrollado por <b>WOY Projects</b></p>
+    </div>
+  </aside>
+
+  <main class="adm-main">
+    <header class="adm-topbar">
+      <span class="tb-search"><svg class="ic"><use href="#i-clock"/></svg>Panamá · <span id="tbClock"></span></span>
+      <div class="tb-right">
+        <div class="notif-wrap">
+          <button class="bell" id="bellBtn" aria-label="Notificaciones">
+            <svg class="ic"><use href="#i-bell"/></svg>
+            <span class="bell-badge" id="bellBadge"></span>
+          </button>
+          <div class="notif-menu" id="notifMenu"></div>
+        </div>
+        <div class="user-wrap">
+          <button class="tb-user" id="userBtn" aria-label="Cuenta">
+            <span class="tb-avatar" id="admAvatar"></span>
+            <span class="tb-meta"><b id="admName"></b><small id="admRole"></small></span>
+            <svg class="ic tb-caret"><use href="#i-arrow"/></svg>
+          </button>
+          <div class="user-menu" id="userMenu"></div>
+        </div>
+      </div>
+    </header>
+    <div class="adm-body" id="view"></div>
+  </main>
+</div>
+
+<!-- Lightbox: enviar contraoferta por WhatsApp -->
+<div class="lb-overlay" id="waLb" aria-hidden="true">
+  <div class="lb-card" id="waCard"></div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+vySeedTalleres();
+vySeedAdmin();
+vySeedShowroom();
+vySyncOwners(); /* crea la ficha de cliente de cada dueño y liga los autos por ownerId */
+
+const ST_ES = ["","Recibido","En revisión","Verificación de documentos","Cita agendada",
+  "Revisado realizado","Oferta enviada","Acuerdo firmado","Trámite de traspaso","Pago liberado"];
+
+const CHECKS = [
+  { k: "tit",  t: "Titularidad",       d: "Registro Único Vehicular / municipio a nombre del vendedor" },
+  { k: "paz",  t: "Paz y salvo",       d: "Placa e impuestos municipales al día" },
+  { k: "grav", t: "Gravamen bancario", d: "Prenda del préstamo declarado verificada con el banco" },
+  { k: "attt", t: "Multas ATTT",       d: "Sin multas pendientes en la ATTT" },
+  { k: "dij",  t: "Reporte de robo",   d: "Verificación DIJ sin reporte de robo" },
+];
+
+const money = vyMoney, km = vyKm;
+const badgeSt = c => {
+  const cls = c.stage >= 9 ? "done" : c.stage >= 6 ? "warn" : "";
+  return `<span class="badge-st ${cls}">${c.stage}/9 · ${ST_ES[c.stage]}</span>`;
+};
+
+/* Quién administra esta sesión (demo). En producción vendría del login del admin. */
+const ADMIN = Object.assign(
+  { name: "Tarek Pastor", role: "Gestor de compras", email: "tarek.pastor@vendeloya.pa", photo: "" },
+  (() => { try { return JSON.parse(localStorage.getItem("vy_admin")) || {}; } catch(e){ return {}; } })()
+);
+
+/* Tipos de cita para el calendario y las etiquetas */
+const CITA_TIPO = {
+  revisado: { label: "Revisado",            cls: "rev" },
+  cita:     { label: "Cita con el cliente", cls: "cita" },
+  reunion:  { label: "Reunión",             cls: "reunion" }
+};
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const MESES_LARGO = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const WEEKDAYS = ["L","M","M","J","V","S","D"];
+
+/* "24 jul" -> { day, month } (índice 0-11) */
+function parseCitaFecha(str){
+  if (!str) return null;
+  const m = String(str).trim().toLowerCase().match(/(\d{1,2})\s+([a-zá]+)/);
+  if (!m) return null;
+  const mon = MESES.findIndex(x => m[2].startsWith(x));
+  return mon < 0 ? null : { day: +m[1], month: mon };
+}
+
+/* Recordatorios de llamada derivados del estado de los autos */
+function reminders(){
+  const cars = vyCars();
+  const list = [];
+  cars.filter(c => c.stage === 6).forEach(c =>
+    list.push({ car:c, reason:"Dar seguimiento a la oferta enviada" }));
+  cars.filter(c => c.cita && c.stage === 4).forEach(c =>
+    list.push({ car:c, reason:`Confirmar cita · ${c.cita.fecha}, ${c.cita.hora}` }));
+  cars.filter(c => c.stage === 2).slice(0,1).forEach(c =>
+    list.push({ car:c, reason:"Contactar para agendar el revisado" }));
+  return list;
+}
+
+/* Feed de notificaciones (derivado del estado + un toque de conversación) */
+function notifs(){
+  const cars = vyCars();
+  const items = [];
+  cars.filter(c => c.stage <= 2).forEach(c =>
+    items.push({ exp:c.id, cls:"", icon:"i-doc", owner:c, time:"Hoy", html:`<b>${esc(c.owner)}</b> publicó un ${esc(c.brand)} ${esc(c.model)}` }));
+  cars.filter(c => c.stage === 6).forEach(c =>
+    items.push({ exp:c.id, cls:"amber", icon:"i-chat", owner:c, time:"Hace 2 h", html:`Oferta enviada a <b>${esc(c.owner)}</b> — espera respuesta` }));
+  cars.filter(c => c.stage >= 9).forEach(c =>
+    items.push({ exp:c.id, cls:"green", icon:"i-check", time:"Ayer", html:`Compra cerrada: <b>${esc(c.brand)} ${esc(c.model)}</b>` }));
+  cars.filter(c => c.cita && c.stage === 4).forEach(c =>
+    items.push({ exp:c.id, cls:"", icon:"i-cal", owner:c, time:"Próxima", html:`Cita con <b>${esc(c.owner)}</b> el ${esc(c.cita.fecha)}` }));
+  /* "respondió por WhatsApp" solo para autos que ya pasaron la oferta (etapa 7–8),
+     así no contradice la notificación de "oferta enviada — espera respuesta" (etapa 6) */
+  const conv = cars.find(c => c.stage >= 7 && c.stage < 9);
+  if (conv) items.unshift({ exp:conv.id, cls:"amber", icon:"i-chat", owner:conv, time:"Hace 20 min", html:`<b>${esc(conv.owner)}</b> respondió por WhatsApp` });
+  return items.slice(0, 6);
+}
+
+/* Estado del calendario: por defecto el mes con citas sembradas */
+function defaultCalMonth(){
+  const yr = new Date().getFullYear();
+  for (const c of vyCars()){
+    const p = parseCitaFecha(c.cita && c.cita.fecha);
+    if (p) return { y: yr, m: p.month };
+  }
+  const t = new Date();
+  return { y: t.getFullYear(), m: t.getMonth() };
+}
+let CAL = defaultCalMonth();
+
+function buildCalendarCells(y, m){
+  const startIdx = (new Date(y, m, 1).getDay() + 6) % 7; /* semana inicia lunes */
+  const days = new Date(y, m + 1, 0).getDate();
+  const nowY = new Date().getFullYear(); /* las citas no llevan año: solo se muestran en el año en curso */
+  const byDay = {};
+  if (y === nowY) vyCars().forEach(c => {
+    if (!c.cita) return;
+    const p = parseCitaFecha(c.cita.fecha);
+    if (p && p.month === m) (byDay[p.day] = byDay[p.day] || []).push(c);
+  });
+  const rem = vyCalRem();
+  const t = new Date();
+  const isToday = d => t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
+  let cells = "";
+  /* sin celdas vacías: el día 1 se posiciona con grid-column-start (evita filas fantasma) */
+  for (let d = 1; d <= days; d++){
+    const evs = byDay[d] || [];
+    const key = `${y}-${m}-${d}`;
+    const rms = rem[key] || [];
+    const startStyle = d === 1 && startIdx > 0 ? ` style="grid-column-start:${startIdx + 1}"` : "";
+    cells += `<div class="cal-cell ${isToday(d) ? "today" : ""}" data-day="${key}" data-dnum="${d}"${startStyle}>
+      <span class="cd-row"><span class="cd">${d}</span><span class="cd-add">+</span></span>
+      ${evs.map(c => {
+        const tp = CITA_TIPO[c.cita.tipo || "revisado"];
+        return `<span class="cal-ev ${tp.cls}" data-exp="${c.id}" title="${esc(tp.label)} · ${esc(c.owner)} · ${esc(c.cita.hora)}">${esc(c.owner)}</span>`;
+      }).join("")}
+      ${rms.map(r => `<span class="cal-ev rem" title="${esc(r.text)}">${esc(r.text)}</span>`).join("")}
+    </div>`;
+  }
+  return cells;
+}
+
+/* Avatar del dueño del auto: foto si la subió, si no sus iniciales (mismo criterio que el expediente) */
+const ownerFace = c => c && c.ownerPhoto
+  ? `<img src="${esc(c.ownerPhoto)}" alt="${esc(c.owner || "Cliente")}">`
+  : vyInitials(c && c.owner);
+
+const rowCar = c => `
+  <button class="row-car" data-exp="${c.id}">
+    <span class="thumb">${vyCarOf(c)}</span>
+    <span>
+      <span class="nm">${esc(c.brand)} ${esc(c.model)} · ${c.year}</span>
+      <span class="who">${esc(c.owner || "Cliente")} · ${km(c.km)} · ${c.photos} fotos${c.videos ? " · " + c.videos + " video" : ""}</span>
+    </span>
+    <span class="st">${badgeSt(c)}</span>
+    <span class="pr"><b>${money(c.price)}</b><span>precio deseado</span></span>
+  </button>`;
+
+/* ---------- Vistas ---------- */
+function vDash(){
+  const cars = vyCars();
+  const nuevos = cars.filter(c => c.stage <= 2).length;
+  const proceso = cars.filter(c => c.stage >= 3 && c.stage <= 8).length;
+  /* misma definición que la vista Citas: todo auto con cita agendada */
+  const citas = cars.filter(c => c.cita).length;
+  const cerrados = cars.filter(c => c.stage >= 9).length;
+  return `
+    <div class="adm-head">
+      <div><h1 class="disp">Resumen</h1><p class="sub">Estado general de la operación</p></div>
+      <div class="right"><span class="badge-st">${cars.length} autos en el sistema</span></div>
+    </div>
+    <div class="stats">
+      <div class="stat hl"><b>${nuevos} <i>·</i></b><span>Nuevos por revisar</span></div>
+      <div class="stat"><b>${proceso}</b><span>En proceso</span></div>
+      <div class="stat"><b>${citas}</b><span>Citas agendadas</span></div>
+      <div class="stat"><b>${cerrados}</b><span>Compras cerradas</span></div>
+    </div>
+    <div class="dash-cols">
+      <div class="panel-card">
+        <h3><svg class="ic"><use href="#i-doc"/></svg>Últimas solicitudes</h3>
+        <div class="dash-grid3">
+          ${cars.slice(0, 6).map(catCard).join("") || '<p class="sub">No hay autos publicados todavía.</p>'}
+        </div>
+      </div>
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-phone"/></svg>Recordatorios de llamada</h3>
+          ${reminders().map(r => { const c = r.car; return `
+            <div class="reminder" data-exp="${c.id}">
+              <span class="rm-face">${ownerFace(c)}</span>
+              <span class="rm-t">
+                <b>${esc(c.owner || "Cliente")}</b>
+                <small class="rm-car">${esc(c.brand)} ${esc(c.model)} · ${c.year}</small>
+                <small>${esc(r.reason)}</small>
+              </span>
+              <a class="rm-call" href="tel:${esc((c.ownerPhone || "").replace(/[^+\d]/g, ""))}" onclick="event.stopPropagation()" aria-label="Llamar a ${esc(c.owner || "cliente")}">
+                <svg class="ic"><use href="#i-phone"/></svg></a>
+            </div>`; }).join("") || '<p class="sub">Sin recordatorios pendientes.</p>'}
+        </div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-bell"/></svg>Notificaciones recientes</h3>
+          ${notifs().map(n => `
+            <button class="feed-item ${n.cls}" ${n.exp ? `data-exp="${n.exp}"` : ""} style="width:100%;text-align:left">
+              ${n.owner
+                ? `<span class="fi-face">${ownerFace(n.owner)}</span>`
+                : `<span class="fi-ic"><svg class="ic"><use href="#${n.icon}"/></svg></span>`}
+              <div><p>${n.html}</p><time>${n.time}</time></div>
+            </button>`).join("")}
+        </div>
+      </div>
+    </div>
+    ${dashChart()}`;
+}
+
+/* Gráfica + tabla de inversión y ganancia de los autos comprados */
+function dashChart(){
+  const comprados = vyCars().filter(c => c.showroom);
+  if (!comprados.length) return "";
+  const vendidos = comprados.filter(c => c.sold);
+  const gastoDe = c => (c.tasks || []).filter(t => t.done).reduce((s, t) => s + (+t.cost || 0), 0);
+  const ganDe = c => c.soldPrice - (c.invest || 0) - gastoDe(c);
+  const totalInv = comprados.reduce((s, c) => s + (c.invest || 0), 0);
+  const totalVenta = vendidos.reduce((s, c) => s + (c.soldPrice || 0), 0);
+  const totalGan = vendidos.reduce((s, c) => s + ganDe(c), 0);
+  const maxV = Math.max(...comprados.map(c => Math.max(c.invest || 0, c.soldPrice || 0)), 1);
+  return `
+    <div class="panel-card" style="margin-top:18px">
+      <h3><svg class="ic"><use href="#i-star"/></svg>Inversión y ganancias · autos comprados</h3>
+      <div class="kpis">
+        <div class="kpi"><span>Total invertido</span><b>${money(totalInv)}</b></div>
+        <div class="kpi"><span>Total en ventas</span><b>${money(totalVenta)}</b></div>
+        <div class="kpi hl"><span>Ganancia total</span><b>${money(totalGan)}</b></div>
+        <div class="kpi"><span>Autos vendidos</span><b>${vendidos.length}/${comprados.length}</b></div>
+      </div>
+      <div class="chart-legend">
+        <span><i style="background:var(--ink)"></i>Inversión</span>
+        <span><i style="background:var(--ok)"></i>Venta</span>
+        <span><i style="background:var(--line);border:1px solid var(--line)"></i>Ganancia</span>
+      </div>
+      <div class="chart">
+        ${comprados.map(c => {
+          const inv = c.invest || 0, ven = c.sold ? c.soldPrice : 0, gan = c.sold ? ganDe(c) : 0;
+          return `
+          <div class="chart-row">
+            <div class="chart-label">${esc(c.brand)} ${esc(c.model)}<small>${c.year}</small></div>
+            <div class="chart-bars">
+              <div class="bar-track"><span class="bar bar-inv" style="width:${inv / maxV * 100}%"></span><em>${money(inv)}</em></div>
+              ${c.sold
+                ? `<div class="bar-track"><span class="bar bar-ven" style="width:${ven / maxV * 100}%"></span><em>${money(ven)} <b class="gan">+${money(gan)}</b></em></div>`
+                : `<div class="bar-track"><span class="chart-proc">En reacondicionamiento</span></div>`}
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="chart-table-wrap">
+        <table class="chart-table">
+          <thead><tr><th>Auto</th><th>Inversión</th><th>Mejoras</th><th>Venta</th><th>Ganancia</th></tr></thead>
+          <tbody>
+            ${comprados.map(c => `
+              <tr>
+                <td>${esc(c.brand)} ${esc(c.model)} <span class="ct-y">${c.year}</span></td>
+                <td>${money(c.invest || 0)}</td>
+                <td>${money(gastoDe(c))}</td>
+                <td>${c.sold ? money(c.soldPrice) : "—"}</td>
+                <td>${c.sold ? `<b class="gan">+${money(ganDe(c))}</b>` : '<span class="ct-proc">En proceso</span>'}</td>
+              </tr>`).join("")}
+            <tr class="ct-total"><td>Totales</td><td>${money(totalInv)}</td><td>${money(comprados.reduce((s,c)=>s+gastoDe(c),0))}</td><td>${money(totalVenta)}</td><td><b class="gan">+${money(totalGan)}</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+const FUEL_ES = { G: "Gasolina", D: "Diésel", H: "Híbrido", E: "Eléctrico" };
+const BODY_ES = { S: "Sedán", H: "Hatchback", U: "SUV / Crossover", P: "Pickup", C: "Coupé", V: "Van" };
+
+function applyFilters(cars){
+  const f = FIL;
+  let out = cars.filter(c =>
+    (f.etapa === "todos" ||
+      (f.etapa === "nuevos" && c.stage <= 2) ||
+      (f.etapa === "proceso" && c.stage >= 3 && c.stage <= 8) ||
+      (f.etapa === "cerrados" && c.stage >= 9)) &&
+    (!f.disp || c.disp) &&
+    (!f.marcas.size || f.marcas.has(c.brand)) &&
+    (!f.bodies.size || f.bodies.has(c.body || "S")) &&
+    (!f.fuels.size || f.fuels.has(c.fuel)) &&
+    (!f.trans || c.trans === f.trans) &&
+    (f.pmin === "" || c.price >= +f.pmin) &&
+    (f.pmax === "" || c.price <= +f.pmax));
+  const s = f.sort;
+  out.sort((a,b) =>
+    s === "pmayor" ? b.price - a.price :
+    s === "pmenor" ? a.price - b.price :
+    s === "anio" ? b.year - a.year :
+    b.created - a.created);
+  return out;
+}
+
+/* Histograma de precios: 20 cubetas entre 0 y el máximo */
+function priceHist(all){
+  const max = Math.max(...all.map(c => c.price), 1000);
+  const top = Math.ceil(max / 1000) * 1000;
+  const N = 20, buckets = Array(N).fill(0);
+  all.forEach(c => buckets[Math.min(N - 1, Math.floor(c.price / top * N))]++);
+  const hmax = Math.max(...buckets, 1);
+  return { top, buckets, hmax };
+}
+
+const catCard = c => `
+  <button class="ccard" data-exp="${c.id}">
+    <div class="ccard-img">${badgeSt2(c)}${c.accident ? `<span class="acc-flag" title="Accidente declarado"><svg class="ic"><use href="#i-alert"/></svg></span>` : ""}${vyCarMedia(c)}</div>
+    <div class="ccard-b">
+      <h3>${esc(c.brand)} ${esc(c.model)} <span style="color:var(--ink-2);font-weight:500">· ${c.year}</span></h3>
+      <p class="cat-owner">${esc(c.owner || "Cliente")} ·
+        <span class="avail ${c.disp ? "" : "off"}">${c.disp ? "Disponible ya" : "En uso diario"}</span></p>
+      <div class="chips">
+        ${c.accident ? `<span class="chip chip-acc"><svg class="ic"><use href="#i-alert"/></svg>Accidente</span>` : ""}
+        <span class="chip">${BODY_ES[c.body || "S"]}</span>
+        <span class="chip"><svg class="ic"><use href="#i-gear"/></svg>${c.trans === "A" ? "Automática" : "Manual"}</span>
+        <span class="chip"><svg class="ic"><use href="#i-road"/></svg>${km(c.km)}</span>
+        <span class="chip"><svg class="ic"><use href="#i-fuel"/></svg>${FUEL_ES[c.fuel]}</span>
+      </div>
+      <div class="ccard-price">
+        <span>Precio deseado${c.offer ? `<span class="of"> · oferta ${money(c.offer)}</span>` : ""}</span>
+        <b>${money(c.price)}</b>
+      </div>
+    </div>
+  </button>`;
+
+const badgeSt2 = c => {
+  const cls = c.stage >= 9 ? "done" : "";
+  const pulse = c.stage < 9 ? '<span class="dotp"></span>' : "";
+  return `<span class="stage-badge ${cls}">${pulse}${ST_ES[c.stage]}</span>`;
+};
+
+function vCola(){
+  const all = vyCars().filter(c => !c.showroom); /* los comprados van al Showroom */
+  const marcas = [...new Set(all.map(c => c.brand))].sort();
+  const cars = applyFilters(all);
+  const f = FIL;
+  return `
+    <div class="adm-head">
+      <div><h1 class="disp">Solicitudes</h1><p class="sub">Autos publicados por clientes — solo visibles para la empresa</p></div>
+    </div>
+    <div class="cat">
+      <aside class="fil-panel">
+        <div class="fil-head"><b>Filtrar por</b><button id="filReset">Limpiar todo ×</button></div>
+        <div class="fgroup">
+          <label class="frow-switch">
+            <span>Solo disponibles ahora</span>
+            <button class="switch ${f.disp ? "on" : ""}" id="fDisp" aria-pressed="${f.disp}"></button>
+          </label>
+        </div>
+        <div class="fgroup">
+          <h4>Etapa</h4>
+          <div class="fseg">
+            ${[["todos","Todos"],["nuevos","Nuevos"],["proceso","En proceso"],["cerrados","Cerrados"]]
+              .map(([k,l]) => `<button data-fetapa="${k}" class="${f.etapa===k?"on":""}">${l}</button>`).join("")}
+          </div>
+        </div>
+        <div class="fgroup">
+          <h4>Precio deseado (US$)</h4>
+          ${(() => {
+            const { top, buckets, hmax } = priceHist(all);
+            const lo = f.pmin === "" ? 0 : +f.pmin;
+            const hi = f.pmax === "" ? top : +f.pmax;
+            return `
+            <div class="hist" id="hist" data-top="${top}">
+              ${buckets.map((b, i) => {
+                const b0 = i / buckets.length * top, b1 = (i + 1) / buckets.length * top;
+                const on = b1 >= lo && b0 <= hi;
+                return `<i class="${on ? "on" : ""}" style="height:${Math.max(6, b / hmax * 100)}%"></i>`;
+              }).join("")}
+            </div>
+            <div class="dual">
+              <span class="fill" id="dualFill" style="left:${lo/top*100}%; right:${100 - hi/top*100}%"></span>
+              <input type="range" id="rMin" min="0" max="${top}" step="100" value="${lo}">
+              <input type="range" id="rMax" min="0" max="${top}" step="100" value="${hi}">
+            </div>
+            <div class="fprice">
+              <label><span>Desde</span><input id="fPmin" type="number" placeholder="0" value="${f.pmin === "" ? "" : lo}"></label>
+              <label><span>Hasta</span><input id="fPmax" type="number" placeholder="${top.toLocaleString("en-US")}" value="${f.pmax === "" ? "" : hi}"></label>
+            </div>`;
+          })()}
+        </div>
+        <div class="fgroup">
+          <h4>Carrocería</h4>
+          ${Object.entries(BODY_ES).map(([k,l]) => {
+            const n = all.filter(c => (c.body || "S") === k).length;
+            return n ? `
+            <label class="fcheck"><input type="checkbox" data-fbody="${k}" ${f.bodies.has(k)?"checked":""}>${l}
+              <span class="cnt">${n}</span></label>` : "";
+          }).join("")}
+        </div>
+        <div class="fgroup">
+          <h4>Marca</h4>
+          ${marcas.map(m => `
+            <label class="fcheck"><input type="checkbox" data-fmarca="${m}" ${f.marcas.has(m)?"checked":""}>${m}
+              <span class="cnt">${all.filter(c => c.brand === m).length}</span></label>`).join("")}
+        </div>
+        <div class="fgroup">
+          <h4>Transmisión</h4>
+          <div class="fseg">
+            ${[["","Todas"],["A","Automática"],["M","Manual"]]
+              .map(([k,l]) => `<button data-ftrans="${k}" class="${f.trans===k?"on":""}">${l}</button>`).join("")}
+          </div>
+        </div>
+        <div class="fgroup">
+          <h4>Combustible</h4>
+          ${Object.entries(FUEL_ES).map(([k,l]) => `
+            <label class="fcheck"><input type="checkbox" data-ffuel="${k}" ${f.fuels.has(k)?"checked":""}>${l}
+              <span class="cnt">${all.filter(c => c.fuel === k).length}</span></label>`).join("")}
+        </div>
+      </aside>
+      <div>
+        <div class="cat-head">
+          <h2 class="disp"><b>${cars.length}</b> ${cars.length === 1 ? "auto publicado" : "autos publicados"}</h2>
+          <select class="sel-sm" id="fSort">
+            <option value="reciente" ${f.sort==="reciente"?"selected":""}>Más recientes</option>
+            <option value="pmayor" ${f.sort==="pmayor"?"selected":""}>Precio: mayor a menor</option>
+            <option value="pmenor" ${f.sort==="pmenor"?"selected":""}>Precio: menor a mayor</option>
+            <option value="anio" ${f.sort==="anio"?"selected":""}>Año: más nuevo</option>
+          </select>
+        </div>
+        <div class="cat-grid">
+          ${cars.map(catCard).join("") || '<div class="cat-empty">Ningún auto coincide con los filtros.</div>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+function vCitas(){
+  const cars = vyCars().filter(c => c.cita);
+  const y = CAL.y, m = CAL.m;
+  return `
+    <div class="adm-head">
+      <div><h1 class="disp">Citas</h1><p class="sub">Agenda de revisados, reuniones y citas con clientes</p></div>
+    </div>
+    <div class="panel-card">
+      <div class="cal-head">
+        <h3>${MESES_LARGO[m]} ${y}</h3>
+        <div class="cal-nav">
+          <button id="calPrev" aria-label="Mes anterior">‹</button>
+          <button id="calNext" aria-label="Mes siguiente">›</button>
+        </div>
+      </div>
+      <div class="cal-legend">
+        <span><i class="cal-dot-rev"></i>Revisado</span>
+        <span><i class="cal-dot-cita"></i>Cita con el cliente</span>
+        <span><i class="cal-dot-reunion"></i>Reunión</span>
+      </div>
+      <div class="cal-grid">
+        ${WEEKDAYS.map(w => `<div class="cal-wd">${w}</div>`).join("")}
+        ${buildCalendarCells(y, m)}
+      </div>
+    </div>
+    <div class="panel-card">
+      <h3><svg class="ic"><use href="#i-cal"/></svg>Todas las citas</h3>
+      ${cars.map(c => {
+        const tp = CITA_TIPO[c.cita.tipo || "revisado"];
+        return `
+        <div class="tt-row">
+          <span class="badge-ic"><svg class="ic"><use href="#i-cal"/></svg></span>
+          <span><b>${esc(c.cita.fecha)} · ${esc(c.cita.hora)}</b><small>${esc(c.cita.taller)}</small></span>
+          <span class="cita-tipo ${tp.cls}">${tp.label}</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" data-exp="${c.id}">${esc(c.brand)} ${esc(c.model)} →</button>
+        </div>`;
+      }).join("") || '<p class="sub">No hay citas agendadas.</p>'}
+    </div>`;
+}
+
+/* Solo se aceptan dataURL de imagen (base64, sin comillas) — evita inyección en CSS/atributos */
+const isImgData = s => typeof s === "string" && /^data:image\/(png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=]+$/i.test(s);
+/* Solo colores hex válidos — evita romper el atributo style con texto arbitrario */
+const safeHex = (c, fb) => (/^#[0-9a-f]{3,8}$/i.test((c || "").trim()) ? c.trim() : fb);
+function tallerBannerStyle(t){
+  if (isImgData(t.banner)) return `background-image:url("${t.banner}"); background-size:cover; background-position:center`;
+  const parts = (t.banner || "#1F2937,#4B5563").split(",");
+  return `background:linear-gradient(135deg, ${safeHex(parts[0], "#1F2937")}, ${safeHex(parts[1], "#4B5563")})`;
+}
+function tallerLogoHtml(t){
+  if (isImgData(t.logo)) return `<img src="${t.logo}" alt="">`;
+  return esc(t.logo || (t.nombre || "T").slice(0, 2).toUpperCase());
+}
+function tallerFull(t){ return `${t.nombre}, ${t.zona}`; }
+
+function vTalleres(){
+  const ts = vyTalleres();
+  return `
+    <div class="adm-head">
+      <div><h1 class="disp">Talleres</h1><p class="sub">Talleres designados para el revisado — historial, contacto y autos en reparación</p></div>
+    </div>
+    <div class="taller-grid">
+      ${ts.map(t => {
+        const full = tallerFull(t);
+        const rev = vyCars().filter(c => c.cita && c.cita.taller === full).length;
+        const rep = vyCars().filter(c => c.showroom && !c.sold && c.taller === full).length;
+        return `
+        <button class="taller-card" data-taller="${t.id}">
+          <div class="tc-banner" style="${tallerBannerStyle(t)}"></div>
+          <span class="tc-logo">${tallerLogoHtml(t)}</span>
+          <div class="tc-body">
+            <b>${esc(t.nombre)}</b><small>${esc(t.zona)} · desde ${esc(t.desde || "")}</small>
+            <div class="tc-stats"><span><b>${rev}</b> revisados</span><span><b>${rep}</b> en reparación</span></div>
+          </div>
+        </button>`;
+      }).join("")}
+    </div>
+    <div class="panel-card">
+      <h3><svg class="ic"><use href="#i-plus"/></svg>Agregar taller</h3>
+      <div class="mini-form">
+        <div class="field"><label>Nombre del taller</label><input id="tNom" placeholder="Ej. Taller Central"></div>
+        <div class="field"><label>Zona</label><input id="tZona" placeholder="Ej. Vía Porras"></div>
+      </div>
+      <button class="btn btn-dark btn-sm" style="margin-top:14px" id="tAdd">
+        <svg class="ic"><use href="#i-plus"/></svg>Agregar taller
+      </button>
+    </div>`;
+}
+
+function vTallerDetail(id){
+  const t = vyTaller(id);
+  if (!t){ location.hash = "#talleres"; return ""; }
+  const full = tallerFull(t);
+  const revisados = vyCars().filter(c => c.cita && c.cita.taller === full);
+  const reparando = vyCars().filter(c => c.showroom && !c.sold && c.taller === full);
+  const tel = (t.phone || "").replace(/[^+\d]/g, "");
+  const wa = (t.phone || "").replace(/[^\d]/g, "");
+  const carRow = (c, attr) => `
+    <button class="row-car" ${attr}="${c.id}">
+      <span class="thumb">${vyCarThumb(c)}</span>
+      <span><span class="nm">${esc(c.brand)} ${esc(c.model)} · ${c.year}</span>
+        <span class="who">${esc(c.owner || "Cliente")} · ${km(c.km)}</span></span>
+      <span class="st">${badgeSt(c)}</span>
+    </button>`;
+  return `
+    <a class="back" href="#talleres"><svg class="ic"><use href="#i-arrow"/></svg>Volver a talleres</a>
+    <div class="taller-hero" style="margin-top:14px">
+      <div class="th-banner" style="${tallerBannerStyle(t)}">
+        <label class="th-upload"><svg class="ic"><use href="#i-camera"/></svg>Cambiar banner<input type="file" accept="image/*" id="tBannerUp" hidden></label>
+      </div>
+      <div class="th-logowrap">
+        <span class="th-logo">${tallerLogoHtml(t)}</span>
+        <label class="th-logo-up" title="Cambiar logo"><svg class="ic"><use href="#i-camera"/></svg><input type="file" accept="image/*" id="tLogoUp" hidden></label>
+      </div>
+      <div class="th-title"><h1 class="disp">${esc(t.nombre)}</h1><p>${esc(t.zona)} · Taller designado desde ${esc(t.desde || "")}</p></div>
+    </div>
+    <div class="exp-grid" style="margin-top:18px">
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-user"/></svg>Datos de contacto</h3>
+          <div class="mini-form">
+            <div class="field"><label>Nombre</label><input id="teNom" value="${esc(t.nombre)}"></div>
+            <div class="field"><label>Zona</label><input id="teZona" value="${esc(t.zona)}"></div>
+            <div class="field"><label>Teléfono</label><input id="teTel" value="${esc(t.phone || "")}"></div>
+            <div class="field"><label>Persona de contacto</label><input id="teCon" value="${esc(t.contacto || "")}"></div>
+          </div>
+          <div class="field" style="margin-top:10px"><label>Correo</label><input id="teMail" value="${esc(t.email || "")}"></div>
+          <div class="contact-btns" style="grid-template-columns:1fr 1fr; margin-top:14px">
+            <a class="call" href="tel:${esc(tel)}"><svg class="ic"><use href="#i-phone"/></svg>Llamar</a>
+            <a class="wa" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-wa"/></svg>WhatsApp</a>
+          </div>
+          <button class="btn btn-dark btn-sm" style="margin-top:14px" id="teSave">Guardar cambios</button>
+          <button class="link-danger" style="margin-left:14px" id="teDel">Quitar taller</button>
+        </div>
+      </div>
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-gear"/></svg>Autos en reparación · ${reparando.length}</h3>
+          ${reparando.map(c => carRow(c, "data-showroom")).join("") || '<p class="sub">Ningún auto en reparación aquí.</p>'}
+        </div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-doc"/></svg>Historial de revisados · ${revisados.length}</h3>
+          ${revisados.map(c => carRow(c, "data-expmodal")).join("") || '<p class="sub">Sin revisados registrados.</p>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---------- Showroom (autos comprados por la empresa) ---------- */
+const showroomCard = c => {
+  const tasks = c.tasks || [];
+  const done = tasks.filter(t => t.done).length;
+  return `
+  <button class="ccard" data-showroom="${c.id}">
+    <div class="ccard-img">
+      ${c.sold ? '<span class="stage-badge done">Vendido</span>' : '<span class="stage-badge warn"><span class="dotp"></span>Reacondicionando</span>'}
+      ${c.accident ? `<span class="acc-flag" title="Accidente declarado"><svg class="ic"><use href="#i-alert"/></svg></span>` : ""}
+      ${vyCarMedia(c)}
+    </div>
+    <div class="ccard-b">
+      <h3>${esc(c.brand)} ${esc(c.model)} <span style="color:var(--ink-2);font-weight:500">· ${c.year}</span></h3>
+      <p class="cat-owner">Comprado a ${esc(c.owner)} · ${done}/${tasks.length} tareas</p>
+      <div class="chips">
+        <span class="chip">${BODY_ES[c.body || "S"]}</span>
+        <span class="chip"><svg class="ic"><use href="#i-road"/></svg>${km(c.km)}</span>
+        <span class="chip"><svg class="ic"><use href="#i-fuel"/></svg>${FUEL_ES[c.fuel]}</span>
+      </div>
+      <div class="ccard-price">
+        <span>Inversión${c.sold ? ` · <span class="of">venta ${money(c.soldPrice)}</span>` : ""}</span>
+        <b>${money(c.invest || c.offer || 0)}</b>
+      </div>
+    </div>
+  </button>`;
+};
+
+function vShowroom(){
+  const cars = vyCars().filter(c => c.showroom);
+  const vendidos = cars.filter(c => c.sold), proceso = cars.filter(c => !c.sold);
+  return `
+    <div class="adm-head">
+      <div><h1 class="disp">Showroom</h1><p class="sub">Autos ya comprados por la empresa — reacondicionamiento, informe del taller y tareas de mejora</p></div>
+      <div class="right"><span class="badge-st warn">${proceso.length} en proceso</span> <span class="badge-st done">${vendidos.length} vendidos</span></div>
+    </div>
+    <div class="cat-grid">
+      ${cars.map(showroomCard).join("") || '<div class="cat-empty">Aún no hay autos comprados en el showroom.</div>'}
+    </div>`;
+}
+
+function vShowroomDetail(id){
+  const c = vyCars().find(x => x.id === id);
+  if (!c || !c.showroom){ location.hash = "#showroom"; return ""; }
+  const tasks = c.tasks || [];
+  const gasto = tasks.filter(t => t.done).reduce((s, t) => s + (+t.cost || 0), 0);
+  const ganancia = c.sold ? (c.soldPrice - (c.invest || 0) - gasto) : null;
+  const done = tasks.filter(t => t.done).length;
+  return `
+    <a class="back" href="#showroom"><svg class="ic"><use href="#i-arrow"/></svg>Volver al showroom</a>
+    <div class="adm-head" style="margin-top:14px">
+      <div>
+        <h1 class="disp">${esc(c.brand)} ${esc(c.model)} · ${c.year}</h1>
+        <p class="sub">Comprado a ${esc(c.owner)} · ${c.sold ? "Vendido el " + esc(c.soldDate) : "En reacondicionamiento"}</p>
+      </div>
+      <div class="right">${c.sold ? '<span class="badge-st done">Vendido</span>' : '<span class="badge-st warn">Reacondicionando</span>'}</div>
+    </div>
+    <div class="exp-grid">
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-camera"/></svg>Vehículo</h3>
+          <div class="ccard-img" style="border-radius:12px">${vyCarMedia(c)}</div>
+          <div class="chips" style="margin-top:14px">
+            <span class="chip">${BODY_ES[c.body || "S"]}</span>
+            <span class="chip"><svg class="ic"><use href="#i-gear"/></svg>${c.trans === "A" ? "Automática" : "Manual"}</span>
+            <span class="chip"><svg class="ic"><use href="#i-road"/></svg>${km(c.km)}</span>
+            <span class="chip"><svg class="ic"><use href="#i-cal"/></svg>${c.year}</span>
+          </div>
+          <div class="dmoney">
+            <div><span>Inversión (pagado al vendedor)</span><b>${money(c.invest || c.offer || 0)}</b></div>
+            ${c.sold ? `<div class="of"><span>Precio de venta</span><b>${money(c.soldPrice)}</b></div>`
+              : `<div><span>Gasto en mejoras</span><b>${money(gasto)}</b></div>`}
+          </div>
+          ${c.sold ? `<div class="debt-line" style="background:#F4FBF6"><svg class="ic" style="color:var(--ok)"><use href="#i-check"/></svg>
+              Ganancia neta: <b style="color:var(--ok)">${money(ganancia)}</b> (venta − inversión − ${money(gasto)} en mejoras)</div>` : ""}
+          ${c.accident ? `<div class="acc-line"><svg class="ic"><use href="#i-alert"/></svg>
+              <span><b>Accidente declarado</b>${c.accidentDesc ? "<br>" + esc(c.accidentDesc) : ""}</span></div>` : ""}
+        </div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-doc"/></svg>Informe del taller · detalles a mejorar</h3>
+          <p class="notice" style="background:#FEF6E7"><svg class="ic" style="color:#B45309"><use href="#i-note"/></svg>
+            ${esc(c.mejoras || "Sin observaciones registradas.")}</p>
+          <button class="btn btn-dark btn-sm" style="margin-top:12px" id="srReport"><svg class="ic"><use href="#i-doc"/></svg>Ver informe completo (PDF)</button>
+        </div>
+      </div>
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-check"/></svg>Tareas de mejora · ${done}/${tasks.length}</h3>
+          <div class="check-prog"><i style="width:${tasks.length ? done / tasks.length * 100 : 0}%"></i></div>
+          <div class="task-list">
+            ${tasks.map((t, i) => `
+              <div class="task-row ${t.done ? "done" : ""}">
+                <button class="task-check" data-task="${i}"><span class="box">${t.done ? '<svg class="ic"><use href="#i-check"/></svg>' : ""}</span></button>
+                <span class="task-t">${esc(t.t)}</span>
+                <span class="task-cost">${t.cost ? money(t.cost) : "—"}</span>
+                <button class="task-del" data-taskdel="${i}" aria-label="Eliminar"><svg class="ic"><use href="#i-x"/></svg></button>
+              </div>`).join("") || '<p class="sub">Aún no hay tareas. Agrega una abajo.</p>'}
+          </div>
+          <div class="mini-form" style="margin-top:14px">
+            <div class="field" style="grid-column:1/2"><label>Nueva tarea de mejora</label><input id="taskInput" placeholder="Ej. Cambiar bujías"></div>
+            <div class="field"><label>Costo (US$)</label><input id="taskCost" type="number" placeholder="0"></div>
+          </div>
+          <button class="btn btn-blue btn-sm" style="margin-top:12px" id="taskAdd"><svg class="ic"><use href="#i-plus"/></svg>Agregar tarea</button>
+        </div>
+        ${!c.sold ? `
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-star"/></svg>Registrar venta</h3>
+          <div class="field"><label>Precio de venta final (US$)</label><input id="srSold" type="number" placeholder="0"></div>
+          <button class="btn btn-dark btn-sm" style="margin-top:12px" id="srSell">Marcar como vendido</button>
+        </div>` : ""}
+      </div>
+    </div>`;
+}
+
+/* Vista de clientes registrados — coordinada con los autos por ownerId */
+function vUsuarios(){
+  vySyncOwners();
+  const users = vyUsers().slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const cars = vyCars();
+  return `
+    <div class="adm-head">
+      <div><h1 class="disp">Usuarios</h1><p class="sub">Clientes registrados — datos de contacto y autos publicados</p></div>
+      <div class="right"><span class="badge-st">${users.length} ${users.length === 1 ? "cliente" : "clientes"}</span></div>
+    </div>
+    <div class="exp-grid" style="grid-template-columns:1.15fr .85fr">
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-user"/></svg>Clientes · ${users.length}</h3>
+          ${users.length ? users.map(u => {
+            const mine = cars.filter(c => c.ownerId === u.id);
+            return `
+            <details class="client-row">
+              <summary>
+                <span class="cl-face">${u.photo ? `<img src="${esc(u.photo)}" alt="${esc(u.name)}">` : vyInitials(u.name)}</span>
+                <span class="cl-meta"><b>${esc(u.name || "Cliente")}</b><small>${esc(u.email || "sin correo")} · ${esc(u.phone || "sin teléfono")}</small></span>
+                <span class="cl-count">${mine.length} auto${mine.length === 1 ? "" : "s"}</span>
+              </summary>
+              <div class="cl-body">
+                <div class="mini-form">
+                  <div class="field"><label>Nombre</label><input id="us_name_${esc(u.id)}" value="${esc(u.name || "")}"></div>
+                  <div class="field"><label>Teléfono</label><input id="us_phone_${esc(u.id)}" value="${esc(u.phone || "")}"></div>
+                </div>
+                <div class="field" style="margin-top:10px"><label>Correo</label><input id="us_email_${esc(u.id)}" value="${esc(u.email || "")}"></div>
+                <div class="cl-actions">
+                  <button class="btn btn-dark btn-sm" data-usave="${esc(u.id)}">Guardar cambios</button>
+                  <button class="link-danger" data-udel="${esc(u.id)}">Eliminar cliente</button>
+                </div>
+                ${mine.length
+                  ? `<div class="cl-cars">${mine.map(c => `<button class="cl-car" data-exp="${c.id}"><span>${esc(c.brand)} ${esc(c.model)} · ${c.year}</span><small>${ST_ES[c.stage]}</small></button>`).join("")}</div>`
+                  : '<p class="sub" style="margin:10px 0 0">Sin autos publicados.</p>'}
+              </div>
+            </details>`;
+          }).join("") : '<p class="sub">Aún no hay clientes registrados. Se crean al publicar un auto o desde el formulario de la derecha.</p>'}
+        </div>
+      </div>
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-plus"/></svg>Crear cliente</h3>
+          <p class="hint" style="margin-bottom:10px">Registra un cliente manualmente. Luego podrás asociarle autos y corregir sus datos.</p>
+          <div class="field"><label>Nombre</label><input id="nuName" placeholder="Ej. Laura Méndez"></div>
+          <div class="field" style="margin-top:10px"><label>Correo</label><input id="nuMail" type="email" placeholder="correo@ejemplo.com"></div>
+          <div class="field" style="margin-top:10px"><label>Teléfono</label><input id="nuPhone" placeholder="+507 6000-0000"></div>
+          <button class="btn btn-blue btn-sm" style="margin-top:14px;width:100%;justify-content:center" id="nuAdd">Crear cliente</button>
+          <p class="notice"><svg class="ic"><use href="#i-shield"/></svg>Datos protegidos por la Ley 81 de 2019 (Panamá). Uso interno de la empresa.</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function vPerfil(){
+  return `
+    <div class="adm-head"><div><h1 class="disp">Mi perfil</h1><p class="sub">Cuenta de la persona que administra esta sesión</p></div></div>
+    <div class="exp-grid">
+      <div>
+        <div class="panel-card">
+          <div class="seller-card">
+            <div class="info">
+              <span class="seller-kicker">Cuenta de empresa</span>
+              <div class="name">${esc(ADMIN.name)}</div>
+              <div class="seller-role">${esc(ADMIN.role)}</div>
+              <span class="seller-status"><span class="dot"></span>Sesión activa</span>
+            </div>
+            <span class="seller-photo">${vyInitials(ADMIN.name)}</span>
+          </div>
+          <div class="mini-form" style="margin-top:16px">
+            <div class="field"><label>Nombre</label><input id="pfNom" value="${esc(ADMIN.name)}"></div>
+            <div class="field"><label>Rol</label><input id="pfRole" value="${esc(ADMIN.role)}"></div>
+          </div>
+          <div class="field" style="margin-top:10px"><label>Correo</label><input id="pfMail" value="${esc(ADMIN.email)}"></div>
+          <button class="btn btn-dark btn-sm" style="margin-top:14px" id="pfSave">Guardar cambios</button>
+        </div>
+      </div>
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-bell"/></svg>Preferencias</h3>
+          <label class="frow-switch" style="padding:6px 0"><span>Notificaciones de nuevas solicitudes</span><button class="switch on" disabled></button></label>
+          <label class="frow-switch" style="padding:6px 0"><span>Recordatorios de citas por correo</span><button class="switch on" disabled></button></label>
+          <label class="frow-switch" style="padding:6px 0"><span>Resumen semanal de ventas</span><button class="switch" disabled></button></label>
+          <p class="notice"><svg class="ic"><use href="#i-shield"/></svg>Panel de demostración. En producción, la cuenta se gestiona con inicio de sesión real y roles por usuario.</p>
+        </div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-user"/></svg>Sesión</h3>
+          <a class="btn btn-ghost btn-sm" href="index.html"><svg class="ic"><use href="#i-arrow"/></svg>Ver sitio público</a>
+          <a class="btn btn-dark btn-sm" href="index.html" style="margin-left:10px">Cerrar sesión</a>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* Documentos: solo PDF o imágenes rasterizadas en dataURL base64 (nada de SVG con scripts) */
+const isDocData = s => typeof s === "string" && /^data:(application\/pdf|image\/(png|jpe?g|gif|webp|avif));base64,[a-z0-9+/=]+$/i.test(s);
+const docKind = mime => /pdf/i.test(mime) ? "pdf" : "img";
+const fmtSize = n => n < 1024*1024 ? Math.max(1, Math.round(n/1024)) + " KB" : (n/1024/1024).toFixed(1) + " MB";
+const edOpt = (val, pairs) => pairs.map(([k, l]) => `<option value="${esc(k)}" ${String(val) === String(k) ? "selected" : ""}>${esc(l)}</option>`).join("");
+
+/* Panel para editar/corregir TODOS los datos del auto y del propietario */
+function editCarPanel(c){
+  const debt = c.debt || {};
+  const cap = s => (s || "").charAt(0).toUpperCase() + (s || "").slice(1);
+  return `
+    <div class="panel-card">
+      <details class="edit-car">
+        <summary><svg class="ic"><use href="#i-note"/></svg>Editar / corregir datos del auto</summary>
+        <div class="edit-body">
+          <div class="mini-form">
+            <div class="field"><label>Marca</label><select id="ed_brand">${VY_BRANDS.map(b => `<option ${c.brand === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></div>
+            <div class="field"><label>Modelo</label><input id="ed_model" value="${esc(c.model || "")}"></div>
+          </div>
+          <div class="mini-form" style="margin-top:10px">
+            <div class="field"><label>Año</label><input id="ed_year" type="number" min="1990" max="2027" value="${esc(c.year || "")}"></div>
+            <div class="field"><label>Kilometraje</label><input id="ed_km" type="number" min="0" value="${esc(c.km || 0)}"></div>
+          </div>
+          <div class="mini-form" style="margin-top:10px">
+            <div class="field"><label>Transmisión</label><select id="ed_trans">${edOpt(c.trans, [["A", "Automática"], ["M", "Manual"]])}</select></div>
+            <div class="field"><label>Combustible</label><select id="ed_fuel">${edOpt(c.fuel, Object.entries(FUEL_ES))}</select></div>
+          </div>
+          <div class="mini-form" style="margin-top:10px">
+            <div class="field"><label>Carrocería</label><select id="ed_body">${edOpt(c.body || "S", Object.entries(BODY_ES))}</select></div>
+            <div class="field"><label>Color</label><select id="ed_color">${edOpt(c.color || "negro", Object.keys(VY_COLORS).map(k => [k, cap(k)]))}</select></div>
+          </div>
+          <div class="mini-form" style="margin-top:10px">
+            <div class="field"><label>Precio deseado (US$)</label><input id="ed_price" type="number" min="0" value="${esc(c.price || 0)}"></div>
+            <div class="field"><label>Fotos / Videos</label>
+              <div style="display:flex;gap:8px">
+                <input id="ed_photos" type="number" min="0" value="${esc(c.photos || 0)}" aria-label="Fotos" style="width:50%">
+                <input id="ed_videos" type="number" min="0" value="${esc(c.videos || 0)}" aria-label="Videos" style="width:50%">
+              </div>
+            </div>
+          </div>
+          <label class="frow-switch" style="padding:8px 0"><span>Disponible de inmediato</span><input type="checkbox" id="ed_disp" ${c.disp ? "checked" : ""}></label>
+          <div class="field"><label>Detalles adicionales</label><textarea id="ed_extras" rows="2">${esc(c.extras || "")}</textarea></div>
+          <label class="frow-switch" style="padding:8px 0"><span>Accidente declarado</span><input type="checkbox" id="ed_acc" ${c.accident ? "checked" : ""}></label>
+          <div class="field"><label>Descripción del accidente</label><textarea id="ed_accDesc" rows="2">${esc(c.accidentDesc || "")}</textarea></div>
+          <label class="frow-switch" style="padding:8px 0"><span>Tiene deuda bancaria</span><input type="checkbox" id="ed_debtHas" ${debt.has ? "checked" : ""}></label>
+          <div class="mini-form">
+            <div class="field"><label>Banco</label><input id="ed_bank" value="${esc(debt.bank || "")}"></div>
+            <div class="field"><label>Monto pendiente</label><input id="ed_amount" type="number" min="0" value="${esc(debt.amount || 0)}"></div>
+          </div>
+          <h4 style="margin:16px 0 6px;font-size:13px">Datos del propietario</h4>
+          <div class="field"><label>Nombre</label><input id="ed_owner" value="${esc(c.owner || "")}"></div>
+          <div class="mini-form" style="margin-top:10px">
+            <div class="field"><label>Teléfono</label><input id="ed_ophone" value="${esc(c.ownerPhone || "")}"></div>
+            <div class="field"><label>Correo</label><input id="ed_omail" value="${esc(c.ownerEmail || "")}"></div>
+          </div>
+          <button class="btn btn-dark btn-sm" style="margin-top:14px" id="edSave">Guardar cambios del auto</button>
+        </div>
+      </details>
+    </div>`;
+}
+
+/* Panel de documentos escaneados por auto (título, cédula, paz y salvo, reporte, etc.) */
+function docsPanel(c){
+  const docs = c.docs || [];
+  return `
+    <div class="panel-card">
+      <h3><svg class="ic"><use href="#i-doc"/></svg>Documentos escaneados · ${docs.length}</h3>
+      <p class="hint" style="margin-bottom:10px">Título de propiedad, cédula, paz y salvo, reporte del revisado… (PDF o imagen, máx. 5 MB).</p>
+      <div class="docs-list">
+        ${docs.length ? docs.map((d, i) => `
+          <div class="doc-item">
+            <span class="doc-ic"><svg class="ic"><use href="#${d.type === "pdf" ? "i-doc" : "i-camera"}"/></svg></span>
+            <span class="doc-meta"><b>${esc(d.name)}</b><small>${esc((d.type || "").toUpperCase())} · ${esc(fmtSize(d.size || 0))}</small></span>
+            <button class="doc-view" data-docview="${i}" title="Ver documento"><svg class="ic"><use href="#i-expand"/></svg></button>
+            <button class="doc-del" data-docdel="${i}" title="Eliminar"><svg class="ic"><use href="#i-x"/></svg></button>
+          </div>`).join("") : '<p class="sub" style="margin:0">Sin documentos cargados todavía.</p>'}
+      </div>
+      <label class="doc-up">
+        <svg class="ic"><use href="#i-plus"/></svg>Subir documento
+        <input type="file" id="docUp" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" hidden>
+      </label>
+    </div>`;
+}
+
+/* Abre un documento (dataURL) en una pestaña nueva vía Blob (evita bloqueos con dataURLs grandes) */
+function openDoc(d){
+  try {
+    const parts = (d.data || "").split(",");
+    const bin = atob(parts[1] || "");
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const blob = new Blob([arr], { type: d.mime || (d.type === "pdf" ? "application/pdf" : "image/png") });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank", "noopener");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (!w) location.href = url;
+  } catch(e){ alert("No se pudo abrir el documento."); }
+}
+
+function vExp(id){
+  const c = vyCars().find(x => x.id === id);
+  if (!c){ location.hash = "#cola"; return ""; }
+  const ck = c.checklist || {};
+  const done = CHECKS.filter(x => ck[x.k]).length;
+  const ts = vyTalleres();
+  return `
+    <a class="back" href="#cola"><svg class="ic"><use href="#i-arrow"/></svg>Volver a solicitudes</a>
+    <div class="adm-head" style="margin-top:14px">
+      <div>
+        <h1 class="disp">${esc(c.brand)} ${esc(c.model)} · ${c.year}</h1>
+        <p class="sub">${esc(c.owner || "Cliente")} · publicado ${new Date(c.created).toLocaleDateString("es-PA")} ${c.demo ? "· auto de ejemplo" : ""}</p>
+      </div>
+      <div class="right">${badgeSt(c)}</div>
+    </div>
+
+    <div class="exp-grid">
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-camera"/></svg>Vehículo</h3>
+          <div class="ccard-img" style="border-radius:12px">
+            ${badgeSt2(c)}
+            ${vyCarMedia(c)}
+          </div>
+          <div class="chips" style="margin-top:14px">
+            <span class="chip">${BODY_ES[c.body || "S"]}</span>
+            <span class="chip"><svg class="ic"><use href="#i-gear"/></svg>${c.trans === "A" ? "Automática" : "Manual"}</span>
+            <span class="chip"><svg class="ic"><use href="#i-road"/></svg>${km(c.km)}</span>
+            <span class="chip"><svg class="ic"><use href="#i-cal"/></svg>${c.year}</span>
+            <span class="chip"><svg class="ic"><use href="#i-camera"/></svg>${c.photos} fotos</span>
+            ${c.videos ? `<span class="chip"><svg class="ic"><use href="#i-video"/></svg>${c.videos} video</span>` : ""}
+          </div>
+          <p style="margin-top:12px"><span class="avail ${c.disp ? "" : "off"}">${c.disp ? "Disponible de inmediato para revisado y entrega" : "El cliente aún usa el auto a diario"}</span></p>
+          <div class="dmoney">
+            <div><span>Precio deseado del cliente</span><b>${money(c.price)}</b></div>
+            <div class="of"><span>Contraoferta</span><b>${c.offer ? money(c.offer) : "—"}</b></div>
+          </div>
+          ${c.debt && c.debt.has ? `
+            <div class="debt-line"><svg class="ic"><use href="#i-bank"/></svg>
+              Préstamo declarado: <b>${esc(c.debt.bank)}</b> · ${money(c.debt.amount)} — se salda primero en el traspaso</div>` : `
+            <div class="debt-line" style="background:#F4FBF6"><svg class="ic" style="color:var(--ok)"><use href="#i-check"/></svg>
+              Sin deuda bancaria declarada</div>`}
+          ${c.accident ? `
+            <div class="acc-line"><svg class="ic"><use href="#i-alert"/></svg>
+              <span><b>Accidente declarado por el vendedor</b>${c.accidentDesc ? "<br>" + esc(c.accidentDesc) : ""}</span></div>` : ""}
+          ${c.extras ? `
+            <div class="extras-line"><svg class="ic"><use href="#i-note"/></svg>
+              <span><b>Detalles adicionales:</b> ${esc(c.extras)}</span></div>` : ""}
+        </div>
+
+        ${editCarPanel(c)}
+
+        ${docsPanel(c)}
+
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-shield"/></svg>Checklist legal (Panamá) · ${done}/5</h3>
+          <div class="check-prog"><i style="width:${done/5*100}%"></i></div>
+          ${CHECKS.map(x => `
+            <button type="button" class="check-row ${ck[x.k] ? "ok" : ""}" data-ck="${x.k}">
+              <span class="box">${ck[x.k] ? '<svg class="ic"><use href="#i-check"/></svg>' : ""}</span>
+              <span><b>${x.t}</b><small>${x.d}</small></span>
+            </button>`).join("")}
+          <p class="notice"><svg class="ic"><use href="#i-shield"/></svg>
+            La investigación de propiedad es obligatoria. El pago al cliente se libera solo al completarse el traspaso legal.</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-user"/></svg>Vendedor</h3>
+          ${(() => {
+            const nombre = c.owner || "Cliente";
+            const nAutos = vyCars().filter(x => x.owner === c.owner).length;
+            const tel = c.ownerPhone || "+507 6123-4567";
+            const mail = c.ownerEmail || "cliente@correo.com";
+            const telHref = tel.replace(/[^+\d]/g, "");
+            const waHref = tel.replace(/[^\d]/g, "");
+            const foto = c.ownerPhoto
+              ? `<img src="${esc(c.ownerPhoto)}" alt="${esc(nombre)}">`
+              : vyInitials(nombre);
+            return `
+          <div class="seller-card">
+            <div class="info">
+              <span class="seller-kicker">Propietario del vehículo</span>
+              <div class="name">${esc(nombre)}</div>
+              <div class="seller-role">Cliente desde jul 2026 · ${nAutos} ${nAutos === 1 ? "auto publicado" : "autos publicados"}</div>
+              <span class="seller-status ${c.disp ? "" : "off"}">
+                <span class="dot"></span>${c.disp ? "Disponible de inmediato" : "En uso diario"}
+              </span>
+            </div>
+            <span class="seller-photo">${foto}</span>
+          </div>
+          <div class="seller-data">
+            <div class="row"><svg class="ic"><use href="#i-phone"/></svg>${esc(tel)}</div>
+            <div class="row"><svg class="ic"><use href="#i-mail"/></svg>${esc(mail)}</div>
+          </div>
+          <div class="contact-btns">
+            <a class="call" href="tel:${esc(telHref)}">
+              <svg class="ic"><use href="#i-phone"/></svg>Llamar</a>
+            <a class="wa" href="https://wa.me/${esc(waHref)}" target="_blank" rel="noopener">
+              <svg class="ic"><use href="#i-wa"/></svg>WhatsApp</a>
+            <a class="em" href="mailto:${esc(mail)}">
+              <svg class="ic"><use href="#i-mail"/></svg>Correo</a>
+          </div>`;
+          })()}
+          <p class="notice"><svg class="ic"><use href="#i-shield"/></svg>
+            Datos personales protegidos por la Ley 81 de 2019 (Panamá). Uso exclusivo para gestionar esta compraventa — no compartir fuera de la empresa.</p>
+        </div>
+
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-clock"/></svg>Etapa del proceso</h3>
+          <div class="stage-ctl">
+            <div class="cur">
+              <span class="dotp"></span>
+              <span><b>${c.stage}/9 · ${ST_ES[c.stage]}</b><small>El cliente ve este estado en su línea de tiempo</small></span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="stBack" ${c.stage <= 1 ? "disabled style='opacity:.4'" : ""}>← Retroceder</button>
+            <button class="btn btn-blue btn-sm" id="stNext" ${c.stage >= 9 ? "disabled style='opacity:.4'" : ""}>Avanzar etapa →</button>
+          </div>
+          <p class="notice"><svg class="ic"><use href="#i-clock"/></svg>
+            Cada cambio se refleja al instante en la cuenta del cliente (notificación en la app real).</p>
+        </div>
+
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-cal"/></svg>Agendar cita</h3>
+          <div class="mini-form">
+            <div class="field"><label>Fecha</label><input id="cFecha" placeholder="Ej. 28 jul" value="${esc(c.cita ? c.cita.fecha : "")}"></div>
+            <div class="field"><label>Hora</label><input id="cHora" placeholder="Ej. 10:30 a.m." value="${esc(c.cita ? c.cita.hora : "")}"></div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Tipo de cita</label>
+            <select id="cTipo">
+              ${Object.entries(CITA_TIPO).map(([k, v]) => {
+                const sel = (c.cita ? (c.cita.tipo || "revisado") : "revisado") === k ? "selected" : "";
+                return `<option value="${k}" ${sel}>${v.label}</option>`;
+              }).join("")}
+            </select>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Taller / lugar</label>
+            <select id="cTaller">
+              <option value="">Elige el taller</option>
+              ${ts.map(t => {
+                const full = `${t.nombre}, ${t.zona}`;
+                return `<option ${c.cita && c.cita.taller === full ? "selected" : ""} value="${esc(full)}">${esc(full)}</option>`;
+              }).join("")}
+            </select>
+          </div>
+          <button class="btn btn-dark btn-sm" style="margin-top:14px" id="cSave">Guardar cita + notificar al cliente</button>
+        </div>
+
+        <div class="panel-card">
+          <h3><svg class="ic"><use href="#i-doc"/></svg>Revisado</h3>
+          <div class="field">
+            <label>Resultado del revisado</label>
+            <select id="oRes">
+              <option ${!c.reporte ? "selected" : ""} value="">Pendiente</option>
+              <option ${c.reporte ? "selected" : ""} value="ok">Reporte subido (PDF)</option>
+            </select>
+          </div>
+          <button class="btn btn-dark btn-sm" style="margin-top:14px" id="oSave">Guardar revisado</button>
+          <p class="notice"><svg class="ic"><use href="#i-doc"/></svg>
+            El reporte del revisado queda disponible para el cliente vendas o no — es parte de la promesa del servicio.</p>
+        </div>
+
+        <div class="panel-card co-panel">
+          <h3><svg class="ic"><use href="#i-doc"/></svg>Contraoferta</h3>
+          <p class="hint" style="margin-bottom:2px">La empresa propone al vendedor. Cada envío queda registrado en el historial con el nombre del vendedor.</p>
+          <div class="co-input-row">
+            <div class="co-field">
+              <span class="co-prefix">US$</span>
+              <input id="coMonto" type="number" min="0" placeholder="0" value="${c.offer || ""}">
+            </div>
+            <button class="btn btn-blue btn-sm" id="coSave">Guardar y enviar</button>
+          </div>
+          <p class="co-by">Propuesto por ${esc(ADMIN.name)}</p>
+          <div class="co-hist">
+            <div class="co-hist-title">Historial de contraofertas</div>
+            ${(c.contraofertas && c.contraofertas.length)
+              ? [...c.contraofertas].reverse().map(o => `
+                <div class="co-hist-item">
+                  <span class="co-amt">${money(o.monto)}</span>
+                  <div><b>${esc(o.vendedor)}</b><small>${esc(o.fecha)}</small></div>
+                </div>`).join("")
+              : '<p class="co-empty">Aún no se ha enviado ninguna contraoferta.</p>'}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---------- Router ---------- */
+const FIL = { etapa: "todos", marcas: new Set(), bodies: new Set(), fuels: new Set(), trans: "", pmin: "", pmax: "", sort: "reciente", disp: false };
+let EXP_MODAL = null; /* id del auto abierto en el pop-up de expediente (desde el taller) */
+
+function render(){
+  const h = location.hash || "#dash";
+  const v = document.getElementById("view");
+  document.querySelectorAll(".side .nav").forEach(b => {
+    const v = b.dataset.v;
+    b.classList.toggle("on",
+      "#" + v === h ||
+      (h.startsWith("#exp=") && v === "cola") ||
+      (h.startsWith("#showroom") && v === "showroom") ||
+      (h.startsWith("#taller=") && v === "talleres"));
+  });
+  /* contadores del menú (badge por sección) */
+  const allCars = vyCars();
+  const navCounts = {
+    dash: "",
+    cola: allCars.filter(c => !c.showroom).length,
+    showroom: allCars.filter(c => c.showroom).length,
+    citas: allCars.filter(c => c.cita).length,
+    talleres: (vyTalleres() || []).length,
+    usuarios: (vyUsers() || []).length
+  };
+  document.querySelectorAll(".nav-count").forEach(s => {
+    const n = navCounts[s.dataset.count];
+    s.textContent = n || "";
+  });
+
+  if (h.startsWith("#exp=")) v.innerHTML = vExp(h.slice(5));
+  else if (h.startsWith("#showroom=")) v.innerHTML = vShowroomDetail(h.slice(10));
+  else if (h === "#showroom") v.innerHTML = vShowroom();
+  else if (h.startsWith("#taller=")) v.innerHTML = vTallerDetail(h.slice(8));
+  else if (h === "#cola") v.innerHTML = vCola();
+  else if (h === "#citas") v.innerHTML = vCitas();
+  else if (h === "#talleres") v.innerHTML = vTalleres();
+  else if (h === "#usuarios") v.innerHTML = vUsuarios();
+  else if (h === "#perfil") v.innerHTML = vPerfil();
+  else v.innerHTML = vDash();
+  renderTopbar();
+  mountExpModal();
+  bind();
+}
+
+/* Pop-up centrado con el expediente del auto (misma vista que en Solicitudes),
+   abierto desde el historial de revisados del taller */
+function mountExpModal(){
+  const old = document.getElementById("expModal");
+  if (old) old.remove();
+  if (!EXP_MODAL){ document.body.style.overflow = ""; return; }
+  const c = vyCars().find(x => x.id === EXP_MODAL);
+  if (!c){ EXP_MODAL = null; return; }
+  const ov = document.createElement("div");
+  ov.className = "lb-overlay open exp-modal";
+  ov.id = "expModal";
+  ov.innerHTML = `
+    <div class="lb-card exp-modal-card">
+      <button class="lb-close" data-expclose aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button>
+      <div class="exp-modal-body">${vExp(EXP_MODAL)}</div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = "hidden";
+  const close = () => { EXP_MODAL = null; document.body.style.overflow = ""; ov.remove(); };
+  ov.addEventListener("click", e => { if (e.target === ov || e.target.closest("[data-expclose]")) close(); });
+}
+
+/* Barra superior: perfil del admin, reloj y campana con notificaciones */
+function renderTopbar(){
+  document.getElementById("admName").textContent = ADMIN.name;
+  document.getElementById("admRole").textContent = ADMIN.role;
+  const av = document.getElementById("admAvatar");
+  av.innerHTML = ADMIN.photo ? `<img src="${esc(ADMIN.photo)}" alt="${esc(ADMIN.name)}">` : vyInitials(ADMIN.name);
+
+  const nt = notifs();
+  const badge = document.getElementById("bellBadge");
+  badge.textContent = nt.length;
+  badge.style.display = nt.length ? "" : "none";
+  document.getElementById("notifMenu").innerHTML = `
+    <div class="nm-head">Notificaciones <span>${nt.length} recientes</span></div>
+    ${nt.map(n => `
+      <button class="notif-item ${n.cls}" ${n.exp ? `data-exp="${n.exp}"` : ""}>
+        <span class="ni-ic"><svg class="ic"><use href="#${n.icon}"/></svg></span>
+        <div><p>${n.html}</p><time>${n.time}</time></div>
+      </button>`).join("")}`;
+
+  document.getElementById("userMenu").innerHTML = `
+    <div class="um-head">
+      <span class="um-av">${vyInitials(ADMIN.name)}</span>
+      <div class="um-id"><b>${esc(ADMIN.name)}</b><small>${esc(ADMIN.email || "tarek.pastor@vendeloya.pa")}</small></div>
+    </div>
+    <button class="um-item" data-v="perfil"><svg class="ic"><use href="#i-user"/></svg>Mi perfil</button>
+    <button class="um-item" data-v="talleres"><svg class="ic"><use href="#i-gear"/></svg>Talleres y configuración</button>
+    <a class="um-item" href="index.html"><svg class="ic"><use href="#i-arrow"/></svg>Ver sitio público</a>
+    <div class="um-sep"></div>
+    <a class="um-item danger" href="index.html"><svg class="ic"><use href="#i-arrow"/></svg>Cerrar sesión</a>`;
+}
+
+function updateClock(){
+  const el = document.getElementById("tbClock");
+  if (!el) return;
+  const d = new Date();
+  el.textContent = d.toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" });
+}
+
+/* ---------- Recordatorio de un día del calendario ---------- */
+function openReminderModal(key, dnum){
+  const [y, m] = key.split("-").map(Number);
+  const rem = vyCalRem();
+  const list = rem[key] || [];
+  const ov = document.createElement("div");
+  ov.className = "lb-overlay open";
+  ov.innerHTML = `
+    <div class="lb-card">
+      <button class="lb-close" data-close aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button>
+      <div class="lb-head">
+        <span class="lb-ic" style="background:var(--blue-soft);color:var(--blue)"><svg class="ic"><use href="#i-bell"/></svg></span>
+        <div><b>${dnum} de ${MESES_LARGO[m]} ${y}</b><small>Recordatorios y notas del día</small></div>
+      </div>
+      <div class="rem-list">
+        ${list.length ? list.map((r, i) => `
+          <div class="rem-item"><span>${esc(r.text)}</span>
+            <button class="rem-del" data-del="${i}" aria-label="Eliminar"><svg class="ic"><use href="#i-x"/></svg></button></div>`).join("")
+          : '<p class="co-empty">Sin recordatorios para este día.</p>'}
+      </div>
+      <div class="field" style="margin-top:14px">
+        <label>Nuevo recordatorio</label>
+        <input id="remInput" type="text" placeholder="Ej. Llamar a José por la contraoferta">
+      </div>
+      <div class="lb-actions">
+        <button class="btn btn-ghost btn-sm" data-close>Cerrar</button>
+        <button class="btn btn-blue btn-sm" id="remAdd" style="flex:1">Guardar recordatorio</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = "hidden";
+  const close = () => { ov.remove(); document.body.style.overflow = ""; render(); };
+  ov.addEventListener("click", e => { if (e.target === ov || e.target.closest("[data-close]")) close(); });
+  ov.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => {
+    vyDelCalRem(key, +b.dataset.del); ov.remove(); document.body.style.overflow = ""; openReminderModal(key, dnum);
+  }));
+  const input = ov.querySelector("#remInput");
+  const add = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    vyAddCalRem(key, { text });
+    ov.remove(); document.body.style.overflow = ""; openReminderModal(key, dnum);
+  };
+  ov.querySelector("#remAdd").addEventListener("click", add);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") add(); });
+  setTimeout(() => input.focus(), 50);
+}
+
+/* ---------- Lightbox: enviar contraoferta por WhatsApp ---------- */
+function waMessage(car, monto){
+  const nombre = (car.owner || "").trim().split(/\s+/)[0] || "estimado(a)";
+  return `Hola ${nombre}, le saluda ${ADMIN.name} de Véndelo Ya. `
+    + `Gracias por publicar su ${car.brand} ${car.model} ${car.year} con nosotros. `
+    + `Revisamos con cuidado la información que nos compartió y con gusto le presentamos una contraoferta de ${vyMoney(monto)} por su vehículo. `
+    + `Si está de acuerdo o desea conversar los siguientes pasos (revisado y traspaso legal), quedamos completamente a su disposición. `
+    + `¡Un cordial saludo!`;
+}
+function waHref(phone, text){
+  return `https://wa.me/${String(phone || "").replace(/[^\d]/g, "")}?text=${encodeURIComponent(text)}`;
+}
+function openWhatsappModal(car, monto){
+  if (!car) return;
+  const lb = document.getElementById("waLb");
+  const card = document.getElementById("waCard");
+  const msg = waMessage(car, monto);
+  card.innerHTML = `
+    <button class="lb-close" id="waClose" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button>
+    <div class="lb-head">
+      <span class="lb-ic"><svg class="ic"><use href="#i-wa"/></svg></span>
+      <div><b>Enviar contraoferta por WhatsApp</b><small>Se abrirá WhatsApp con el mensaje listo para enviar</small></div>
+    </div>
+    <div class="lb-contact">
+      <span class="lb-av">${vyInitials(car.owner)}</span>
+      <div class="lb-who"><b>${esc(car.owner || "Cliente")}</b><small>${esc(car.ownerPhone || "")}</small></div>
+      <span class="lb-amt">${money(monto)}</span>
+    </div>
+    <label class="lb-label">Mensaje</label>
+    <textarea id="waMsg" rows="7">${esc(msg)}</textarea>
+    <div class="lb-actions">
+      <button class="btn btn-ghost btn-sm" id="waCancel">Cancelar</button>
+      <a class="btn btn-wa btn-sm" id="waSend" href="${waHref(car.ownerPhone, msg)}" target="_blank" rel="noopener">
+        <svg class="ic"><use href="#i-wa"/></svg>Abrir WhatsApp</a>
+    </div>`;
+  lb.classList.add("open");
+  lb.setAttribute("aria-hidden", "false");
+  const close = () => { lb.classList.remove("open"); lb.setAttribute("aria-hidden", "true"); };
+  document.getElementById("waClose").onclick = close;
+  document.getElementById("waCancel").onclick = close;
+  lb.onclick = e => { if (e.target === lb) close(); };
+  const msgEl = document.getElementById("waMsg");
+  msgEl.addEventListener("input", () => {
+    document.getElementById("waSend").href = waHref(car.ownerPhone, msgEl.value);
+  });
+}
+
+function bindShowroom(){
+  const h = location.hash;
+  if (!h.startsWith("#showroom=")) return;
+  const id = h.slice(10);
+  const carOr = () => vyCars().find(x => x.id === id);
+  document.querySelectorAll("[data-task]").forEach(el => el.addEventListener("click", () => {
+    const c = carOr(); if (!c) return;
+    const tasks = (c.tasks || []).slice(); const i = +el.dataset.task;
+    tasks[i] = Object.assign({}, tasks[i], { done: !tasks[i].done });
+    vyUpdateCar(id, { tasks }); render();
+  }));
+  document.querySelectorAll("[data-taskdel]").forEach(el => el.addEventListener("click", () => {
+    const c = carOr(); if (!c) return;
+    const tasks = (c.tasks || []).slice(); tasks.splice(+el.dataset.taskdel, 1);
+    vyUpdateCar(id, { tasks }); render();
+  }));
+  const ta = document.getElementById("taskAdd");
+  if (ta) ta.addEventListener("click", () => {
+    const c = carOr(); if (!c) return;
+    const t = document.getElementById("taskInput").value.trim();
+    if (!t){ alert("Escribe la tarea de mejora."); return; }
+    const cost = +document.getElementById("taskCost").value || 0;
+    const tasks = (c.tasks || []).slice(); tasks.push({ t, cost, done: false });
+    vyUpdateCar(id, { tasks }); render();
+  });
+  const sell = document.getElementById("srSell");
+  if (sell) sell.addEventListener("click", () => {
+    const c = carOr(); if (!c) return;
+    const p = +document.getElementById("srSold").value;
+    if (!p || p <= 0){ alert("Ingresa el precio de venta final."); return; }
+    const dt = new Date();
+    vyUpdateCar(id, { sold: true, soldPrice: p, soldDate: `${dt.getDate()} ${MESES[dt.getMonth()]}` });
+    render();
+  });
+  const rep = document.getElementById("srReport");
+  if (rep) rep.addEventListener("click", () => alert("Demo: aquí se abriría el PDF del informe del taller con los detalles a mejorar."));
+}
+
+function bindTaller(){
+  const h = location.hash;
+  if (!h.startsWith("#taller=")) return;
+  const id = h.slice(8);
+  const save = document.getElementById("teSave");
+  if (save) save.addEventListener("click", () => {
+    const ts = vyTalleres(); const t = ts.find(x => x.id === id); if (!t) return;
+    t.nombre = document.getElementById("teNom").value.trim() || t.nombre;
+    t.zona = document.getElementById("teZona").value.trim();
+    t.phone = document.getElementById("teTel").value.trim();
+    t.contacto = document.getElementById("teCon").value.trim();
+    t.email = document.getElementById("teMail").value.trim();
+    vySaveTalleres(ts); render();
+  });
+  const del = document.getElementById("teDel");
+  if (del) del.addEventListener("click", () => {
+    if (!confirm("¿Quitar este taller?")) return;
+    vySaveTalleres(vyTalleres().filter(x => x.id !== id)); location.hash = "#talleres";
+  });
+  const readImg = (input, field) => {
+    const f = input.files && input.files[0]; if (!f) return;
+    /* solo imágenes rasterizadas y hasta 4 MB (evita SVG con scripts y archivos enormes) */
+    if (!/^image\/(png|jpe?g|gif|webp|avif)$/i.test(f.type)){ alert("Sube una imagen válida (PNG, JPG, GIF o WebP)."); input.value = ""; return; }
+    if (f.size > 4 * 1024 * 1024){ alert("La imagen supera 4 MB. Usa una más liviana."); input.value = ""; return; }
+    const r = new FileReader();
+    r.onload = () => {
+      if (!isImgData(r.result)){ alert("No se pudo leer la imagen."); return; }
+      const ts = vyTalleres(); const t = ts.find(x => x.id === id);
+      if (t){ t[field] = r.result; vySaveTalleres(ts); render(); }
+    };
+    r.readAsDataURL(f);
+  };
+  const bn = document.getElementById("tBannerUp"); if (bn) bn.addEventListener("change", () => readImg(bn, "banner"));
+  const lg = document.getElementById("tLogoUp"); if (lg) lg.addEventListener("change", () => readImg(lg, "logo"));
+}
+
+function bindPerfil(){
+  const s = document.getElementById("pfSave");
+  if (s) s.addEventListener("click", () => {
+    ADMIN.name = document.getElementById("pfNom").value.trim() || ADMIN.name;
+    ADMIN.role = document.getElementById("pfRole").value.trim() || ADMIN.role;
+    ADMIN.email = document.getElementById("pfMail").value.trim() || ADMIN.email;
+    try { localStorage.setItem("vy_admin", JSON.stringify(ADMIN)); } catch(e){}
+    render();
+  });
+}
+
+/* Gestión de clientes: crear, editar (propaga a sus autos) y eliminar */
+function bindUsuarios(){
+  const add = document.getElementById("nuAdd");
+  if (add) add.addEventListener("click", () => {
+    const name = document.getElementById("nuName").value.trim();
+    const email = document.getElementById("nuMail").value.trim();
+    const phone = document.getElementById("nuPhone").value.trim();
+    if (!name){ alert("El nombre del cliente es obligatorio."); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ alert("El correo no tiene un formato válido."); return; }
+    vyUpsertUser({ name, email, phone, provider: "manual" });
+    render();
+  });
+  document.querySelectorAll("[data-usave]").forEach(el =>
+    el.addEventListener("click", () => {
+      const uid = el.dataset.usave;
+      const g = k => { const e = document.getElementById(k + uid); return e ? e.value.trim() : ""; };
+      const name = g("us_name_"), phone = g("us_phone_"), email = g("us_email_");
+      if (!name){ alert("El nombre no puede quedar vacío."); return; }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ alert("El correo no tiene un formato válido."); return; }
+      const list = vyUsers(); const u = list.find(x => x.id === uid);
+      if (!u){ render(); return; }
+      u.name = name; u.phone = phone; u.email = email; vySaveUsers(list);
+      /* propaga a los autos del cliente y a la sesión si es el usuario en curso */
+      const cars = vyCars(); let ch = false;
+      cars.forEach(c => { if (c.ownerId === uid){ c.owner = name; c.ownerPhone = phone; c.ownerEmail = email; ch = true; } });
+      if (ch) vySaveCars(cars);
+      render();
+    }));
+  document.querySelectorAll("[data-udel]").forEach(el =>
+    el.addEventListener("click", () => {
+      const uid = el.dataset.udel;
+      const nCars = vyCars().filter(c => c.ownerId === uid).length;
+      const msg = nCars
+        ? `Este cliente tiene ${nCars} auto(s). Se eliminará su ficha pero los autos se conservan. ¿Continuar?`
+        : "¿Eliminar este cliente?";
+      if (!confirm(msg)) return;
+      vySaveUsers(vyUsers().filter(u => u.id !== uid));
+      render();
+    }));
+}
+
+function bind(){
+  document.querySelectorAll("[data-exp]").forEach(el =>
+    el.addEventListener("click", () => location.hash = "#exp=" + el.dataset.exp));
+  document.querySelectorAll("[data-expmodal]").forEach(el =>
+    el.addEventListener("click", () => { EXP_MODAL = el.dataset.expmodal; render(); }));
+  document.querySelectorAll("[data-showroom]").forEach(el =>
+    el.addEventListener("click", () => location.hash = "#showroom=" + el.dataset.showroom));
+  document.querySelectorAll("[data-taller]").forEach(el =>
+    el.addEventListener("click", () => location.hash = "#taller=" + el.dataset.taller));
+
+  bindShowroom();
+  bindTaller();
+  bindPerfil();
+  bindUsuarios();
+
+  /* filtros del catálogo */
+  document.querySelectorAll("[data-fetapa]").forEach(el =>
+    el.addEventListener("click", () => { FIL.etapa = el.dataset.fetapa; render(); }));
+  document.querySelectorAll("[data-ftrans]").forEach(el =>
+    el.addEventListener("click", () => { FIL.trans = el.dataset.ftrans; render(); }));
+  document.querySelectorAll("[data-fmarca]").forEach(el =>
+    el.addEventListener("change", () => {
+      el.checked ? FIL.marcas.add(el.dataset.fmarca) : FIL.marcas.delete(el.dataset.fmarca);
+      render();
+    }));
+  document.querySelectorAll("[data-ffuel]").forEach(el =>
+    el.addEventListener("change", () => {
+      el.checked ? FIL.fuels.add(el.dataset.ffuel) : FIL.fuels.delete(el.dataset.ffuel);
+      render();
+    }));
+  const fd = document.getElementById("fDisp");
+  if (fd) fd.addEventListener("click", () => { FIL.disp = !FIL.disp; render(); });
+  document.querySelectorAll("[data-fbody]").forEach(el =>
+    el.addEventListener("change", () => {
+      el.checked ? FIL.bodies.add(el.dataset.fbody) : FIL.bodies.delete(el.dataset.fbody);
+      render();
+    }));
+
+  /* doble slider de precio: arrastre en vivo, filtro al soltar */
+  const rMin = document.getElementById("rMin"), rMax = document.getElementById("rMax");
+  if (rMin && rMax){
+    const top = +document.getElementById("hist").dataset.top;
+    const live = () => {
+      let lo = Math.min(+rMin.value, +rMax.value);
+      let hi = Math.max(+rMin.value, +rMax.value);
+      const fill = document.getElementById("dualFill");
+      fill.style.left = (lo / top * 100) + "%";
+      fill.style.right = (100 - hi / top * 100) + "%";
+      document.getElementById("fPmin").value = lo;
+      document.getElementById("fPmax").value = hi;
+      [...document.getElementById("hist").children].forEach((bar, i, arr) => {
+        const b0 = i / arr.length * top, b1 = (i + 1) / arr.length * top;
+        bar.classList.toggle("on", b1 >= lo && b0 <= hi);
+      });
+      return { lo, hi };
+    };
+    const commit = () => {
+      const { lo, hi } = live();
+      FIL.pmin = lo === 0 ? "" : String(lo);
+      FIL.pmax = hi >= top ? "" : String(hi);
+      render();
+    };
+    [rMin, rMax].forEach(r => { r.addEventListener("input", live); r.addEventListener("change", commit); });
+  }
+  const pmin = document.getElementById("fPmin");
+  if (pmin) pmin.addEventListener("change", () => { FIL.pmin = pmin.value; render(); });
+  const pmax = document.getElementById("fPmax");
+  if (pmax) pmax.addEventListener("change", () => { FIL.pmax = pmax.value; render(); });
+  const srt = document.getElementById("fSort");
+  if (srt) srt.addEventListener("change", () => { FIL.sort = srt.value; render(); });
+  const frs = document.getElementById("filReset");
+  if (frs) frs.addEventListener("click", () => {
+    FIL.etapa = "todos"; FIL.marcas.clear(); FIL.bodies.clear(); FIL.fuels.clear();
+    FIL.trans = ""; FIL.pmin = ""; FIL.pmax = ""; FIL.sort = "reciente"; FIL.disp = false;
+    render();
+  });
+
+  const id = location.hash.startsWith("#exp=") ? location.hash.slice(5) : (EXP_MODAL || null);
+  if (id){
+    /* el auto pudo haberse eliminado en otra pestaña entre el render y el clic */
+    const carOr = () => vyCars().find(x => x.id === id);
+
+    document.querySelectorAll("[data-ck]").forEach(el =>
+      el.addEventListener("click", () => {
+        const c = carOr();
+        if (!c){ render(); return; }
+        const ck = Object.assign({}, c.checklist);
+        ck[el.dataset.ck] = !ck[el.dataset.ck];
+        vyUpdateCar(id, { checklist: ck });
+        render();
+      }));
+
+    const nx = document.getElementById("stNext");
+    if (nx) nx.addEventListener("click", () => {
+      const c = carOr();
+      if (!c){ render(); return; }
+      if (c.stage < 9) vyUpdateCar(id, { stage: c.stage + 1 });
+      render();
+    });
+    const bk = document.getElementById("stBack");
+    if (bk) bk.addEventListener("click", () => {
+      const c = carOr();
+      if (!c){ render(); return; }
+      if (c.stage > 1) vyUpdateCar(id, { stage: c.stage - 1 });
+      render();
+    });
+
+    const cs = document.getElementById("cSave");
+    if (cs) cs.addEventListener("click", () => {
+      const fecha = document.getElementById("cFecha").value.trim();
+      const hora = document.getElementById("cHora").value.trim();
+      const tipo = document.getElementById("cTipo").value;
+      const taller = document.getElementById("cTaller").value;
+      if (!fecha || !hora || !taller){ alert("Completa fecha, hora y taller/lugar."); return; }
+      const c = carOr();
+      if (!c){ render(); return; }
+      vyUpdateCar(id, { cita: { fecha, hora, tipo, taller }, stage: Math.max(c.stage, 4) });
+      render();
+    });
+
+    const os = document.getElementById("oSave");
+    if (os) os.addEventListener("click", () => {
+      const c = carOr();
+      if (!c){ render(); return; }
+      const reporte = document.getElementById("oRes").value === "ok";
+      vyUpdateCar(id, { reporte, stage: reporte ? Math.max(c.stage, 5) : c.stage });
+      render();
+    });
+
+    /* Contraoferta: la empresa la propone; se guarda en el historial con el nombre del vendedor */
+    const co = document.getElementById("coSave");
+    if (co) co.addEventListener("click", () => {
+      const c = carOr();
+      if (!c){ render(); return; }
+      const monto = +document.getElementById("coMonto").value;
+      if (!monto || monto <= 0){ alert("Ingresa el monto de la contraoferta."); return; }
+      const hist = (c.contraofertas || []).slice();
+      const dt = new Date();
+      const hh = dt.getHours(), h12 = ((hh + 11) % 12) + 1, ap = hh < 12 ? "a. m." : "p. m.";
+      const fecha = `${dt.getDate()} ${MESES[dt.getMonth()]}, ${String(h12).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")} ${ap}`;
+      hist.push({ monto, vendedor: c.owner || "Cliente", fecha });
+      const updated = vyUpdateCar(id, { offer: monto, contraofertas: hist, stage: Math.max(c.stage, 6) });
+      render();
+      openWhatsappModal(updated, monto); /* guardar y enviar → abrir lightbox */
+    });
+
+    /* Editar / corregir todos los datos del auto y del propietario */
+    const ed = document.getElementById("edSave");
+    if (ed) ed.addEventListener("click", () => {
+      const c = carOr();
+      if (!c){ render(); return; }
+      const val = k => { const e = document.getElementById(k); return e ? e.value : ""; };
+      const num = k => { const n = parseInt(val(k), 10); return isNaN(n) ? 0 : n; };
+      const chk = k => { const e = document.getElementById(k); return !!(e && e.checked); };
+      const model = val("ed_model").trim();
+      const year = num("ed_year");
+      if (!model){ alert("El modelo no puede quedar vacío."); return; }
+      if (year && (year < 1990 || year > 2027)){ alert("El año debe estar entre 1990 y 2027."); return; }
+      const owner = val("ed_owner").trim() || c.owner;
+      const ownerPhone = val("ed_ophone").trim();
+      const ownerEmail = val("ed_omail").trim();
+      vyUpdateCar(id, {
+        brand: val("ed_brand"), model, year, km: num("ed_km"),
+        trans: val("ed_trans"), fuel: val("ed_fuel"), body: val("ed_body"), color: val("ed_color"),
+        price: num("ed_price"), photos: num("ed_photos"), videos: num("ed_videos"),
+        disp: chk("ed_disp"), extras: val("ed_extras").trim(),
+        accident: chk("ed_acc"), accidentDesc: val("ed_accDesc").trim(),
+        debt: { has: chk("ed_debtHas"), bank: val("ed_bank").trim(), amount: num("ed_amount") },
+        owner, ownerPhone, ownerEmail
+      });
+      /* coordina el cambio con la ficha del cliente si el auto está ligado */
+      if (c.ownerId){
+        const list = vyUsers(); const u = list.find(x => x.id === c.ownerId);
+        if (u){ u.name = owner; u.phone = ownerPhone; u.email = ownerEmail; vySaveUsers(list); }
+      }
+      render();
+    });
+
+    /* Subir documento escaneado (PDF o imagen) */
+    const dUp = document.getElementById("docUp");
+    if (dUp) dUp.addEventListener("change", () => {
+      const f = dUp.files && dUp.files[0]; if (!f) return;
+      if (!/^(application\/pdf|image\/(png|jpe?g|webp|gif))$/i.test(f.type)){ alert("Sube un PDF o una imagen (PNG, JPG, WebP)."); dUp.value = ""; return; }
+      if (f.size > 5 * 1024 * 1024){ alert("El archivo supera 5 MB. Usa uno más liviano o comprímelo."); dUp.value = ""; return; }
+      const r = new FileReader();
+      r.onload = () => {
+        if (!isDocData(r.result)){ alert("No se pudo leer el archivo."); return; }
+        const c = carOr(); if (!c){ render(); return; }
+        const docs = (c.docs || []).slice();
+        docs.push({ name: f.name, type: docKind(f.type), size: f.size, mime: f.type, data: r.result });
+        try {
+          if (!vyUpdateCar(id, { docs })) throw new Error("sin auto");
+          render();
+        } catch(e){
+          alert("No se pudo guardar el documento (almacenamiento lleno). Elimina alguno o usa archivos más livianos.");
+        }
+      };
+      r.readAsDataURL(f);
+    });
+    document.querySelectorAll("[data-docview]").forEach(el =>
+      el.addEventListener("click", () => {
+        const c = carOr(); if (!c || !c.docs) return;
+        const d = c.docs[+el.dataset.docview]; if (d) openDoc(d);
+      }));
+    document.querySelectorAll("[data-docdel]").forEach(el =>
+      el.addEventListener("click", () => {
+        const c = carOr(); if (!c || !c.docs) return;
+        if (!confirm("¿Eliminar este documento?")) return;
+        const docs = c.docs.slice(); docs.splice(+el.dataset.docdel, 1);
+        vyUpdateCar(id, { docs }); render();
+      }));
+  }
+
+  const ta = document.getElementById("tAdd");
+  if (ta) ta.addEventListener("click", () => {
+    const nombre = document.getElementById("tNom").value.trim();
+    const zona = document.getElementById("tZona").value.trim();
+    if (!nombre || !zona){ alert("Completa nombre y zona."); return; }
+    const ts = vyTalleres();
+    ts.push({ id: "t" + Math.random().toString(36).slice(2,7), nombre, zona });
+    vySaveTalleres(ts);
+    render();
+  });
+  document.querySelectorAll("[data-delt]").forEach(el =>
+    el.addEventListener("click", () => {
+      vySaveTalleres(vyTalleres().filter(t => t.id !== el.dataset.delt));
+      render();
+    }));
+
+  /* navegación del calendario */
+  const cp = document.getElementById("calPrev");
+  if (cp) cp.addEventListener("click", () => {
+    CAL.m--; if (CAL.m < 0){ CAL.m = 11; CAL.y--; } render();
+  });
+  const cn = document.getElementById("calNext");
+  if (cn) cn.addEventListener("click", () => {
+    CAL.m++; if (CAL.m > 11){ CAL.m = 0; CAL.y++; } render();
+  });
+  /* clic en un día del calendario → crear recordatorio (si no se clickeó un evento) */
+  document.querySelectorAll("[data-day]").forEach(cell =>
+    cell.addEventListener("click", e => {
+      if (e.target.closest("[data-exp]")) return;
+      openReminderModal(cell.dataset.day, +cell.dataset.dnum);
+    }));
+
+  document.querySelectorAll(".side .nav").forEach(b =>
+    b.addEventListener("click", () => location.hash = "#" + b.dataset.v));
+}
+
+/* Campana de notificaciones + menú de usuario: abrir/cerrar (una sola vez) */
+function initTopbar(){
+  const bell = document.getElementById("bellBtn");
+  const menu = document.getElementById("notifMenu");
+  const uBtn = document.getElementById("userBtn");
+  const uMenu = document.getElementById("userMenu");
+  bell.addEventListener("click", e => { e.stopPropagation(); uMenu.classList.remove("open"); menu.classList.toggle("open"); });
+  uBtn.addEventListener("click", e => { e.stopPropagation(); menu.classList.remove("open"); uMenu.classList.toggle("open"); });
+  document.addEventListener("click", e => {
+    if (!menu.contains(e.target) && !bell.contains(e.target)) menu.classList.remove("open");
+    if (!uMenu.contains(e.target) && !uBtn.contains(e.target)) uMenu.classList.remove("open");
+  });
+  menu.addEventListener("click", e => {
+    const item = e.target.closest("[data-exp]");
+    if (item){ menu.classList.remove("open"); location.hash = "#exp=" + item.dataset.exp; }
+  });
+  /* opciones del menú de usuario que navegan a una vista */
+  uMenu.addEventListener("click", e => {
+    const item = e.target.closest("[data-v]");
+    if (item){ uMenu.classList.remove("open"); location.hash = "#" + item.dataset.v; }
+  });
+  updateClock();
+  setInterval(updateClock, 30000);
+}
+
+window.addEventListener("hashchange", () => { EXP_MODAL = null; render(); });
+window.addEventListener("storage", render);
+document.addEventListener("DOMContentLoaded", () => { initTopbar(); render(); });
+</script>
+</body>
+</html>

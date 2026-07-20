@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El servicio — Véndelo Ya</title>
+<meta name="description" content="Cómo funciona Véndelo Ya: publica tu auto, revisado de US$60, oferta, acuerdo confidencial y pago al traspaso legal.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23005CFF'/><text x='50' y='68' font-size='52' font-family='Archivo,sans-serif' font-weight='800' fill='white' text-anchor='middle'>V</text></svg>">
+</head>
+<body>
+
+<header class="hd">
+  <div class="wrap hd-in">
+    <a class="logo" href="index.html"><span class="slash">/</span>VÉNDELO<b>YA</b></a>
+    <nav>
+      <a href="servicio.html" style="color:var(--ink)" data-i="nav.servicio"></a>
+      <a href="index.html#faq" data-i="nav.faq"></a>
+      <a href="index.html#contacto" data-i="nav.contacto"></a>
+    </nav>
+    <div class="hd-right">
+      <div class="langs">
+        <button data-setlang="es">ES</button>
+        <button data-setlang="en">EN</button>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="login.html" data-i="nav.entrar"></a>
+      <a class="btn btn-blue btn-sm" href="registro.html" data-i="nav.vender"></a>
+    </div>
+  </div>
+</header>
+
+<section class="blk" style="padding-bottom:64px">
+  <div class="wrap">
+    <div class="blk-head rev in">
+      <span class="kicker" data-i="svc.kicker"></span>
+      <h2 class="disp" data-i="svc.title"></h2>
+      <p data-i="svc.intro"></p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1.1fr .9fr; gap:64px; align-items:start" id="svcGrid">
+      <!-- Timeline completa del servicio -->
+      <div class="tl rev in d1" id="svcTl"></div>
+
+      <!-- Lateral: quién paga + legal + CTA -->
+      <div style="display:grid; gap:18px; position:sticky; top:96px">
+        <div class="scard rev in d2" style="flex-direction:column">
+          <span class="badge-ic"><svg class="ic"><use href="#i-doc"/></svg></span>
+          <div>
+            <h3 data-i="svc.who"></h3>
+            <p style="margin-top:10px; display:flex; gap:8px; align-items:flex-start">
+              <svg class="ic" style="width:15px;height:15px;color:var(--ok);margin-top:3px;flex:none"><use href="#i-check"/></svg>
+              <span data-i="svc.who1"></span>
+            </p>
+            <p style="margin-top:8px; display:flex; gap:8px; align-items:flex-start">
+              <svg class="ic" style="width:15px;height:15px;color:var(--blue);margin-top:3px;flex:none"><use href="#i-doc"/></svg>
+              <span data-i="svc.who2"></span>
+            </p>
+          </div>
+        </div>
+        <div class="legal-pay rev in d3" style="margin-top:0">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span data-i="legal.pay"></span>
+        </div>
+        <a class="btn btn-blue btn-lg rev in d4" href="registro.html" style="justify-content:center">
+          <span data-i="svc.cta"></span>
+          <svg class="ic"><use href="#i-arrow"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="logo" href="index.html"><span class="slash">/</span>VÉNDELO<b>YA</b></a>
+      <p class="foot-tag" data-i="foot.tag"></p>
+    </div>
+    <div class="foot-links">
+      <a href="aviso-legal.html" data-i="foot.legal"></a>
+      <a href="terminos.html" data-i="foot.terms"></a>
+      <a href="privacidad.html" data-i="foot.priv"></a>
+      <a href="admin.html">Empresa</a>
+      <span>© 2026 Véndelo Ya · Panamá</span>
+    </div>
+  </div>
+  <div class="wrap"><p class="foot-credit"><span data-i="foot.credit"></span> <b>WOY Projects</b></p></div>
+</footer>
+
+<script src="shared.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const icons = ["camera","clock","doc","pin","doc","shield","bank","check"];
+  function render(){
+    document.getElementById("svcTl").innerHTML =
+      Array.from({length:8}, (_,i) => i+1).map(n => `
+        <div class="tl-item done" style="padding-bottom:34px">
+          <span class="tl-dot" style="background:var(--ink);border-color:var(--ink)">
+            <svg class="ic"><use href="#i-${icons[n-1]}"/></svg>
+          </span>
+          <h4 style="font-size:18px">${String(n).padStart(2,"0")} · ${t("svc.s"+n+"t")}</h4>
+          <p style="font-size:14.5px; max-width:56ch">${t("svc.s"+n+"d")}</p>
+        </div>`).join("");
+  }
+  render();
+  document.addEventListener("vy:lang", render);
+
+  if (matchMedia("(max-width:860px)").matches){
+    document.getElementById("svcGrid").style.gridTemplateColumns = "1fr";
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crear cuenta — Véndelo Ya</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23005CFF'/><text x='50' y='68' font-size='52' font-family='Archivo,sans-serif' font-weight='800' fill='white' text-anchor='middle'>V</text></svg>">
+</head>
+<body>
+
+<header class="hd">
+  <div class="wrap hd-in">
+    <a class="logo" href="index.html"><span class="slash">/</span>VÉNDELO<b>YA</b></a>
+    <div class="hd-right">
+      <div class="langs">
+        <button data-setlang="es">ES</button>
+        <button data-setlang="en">EN</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="auth-wrap">
+  <div class="auth-card rev in">
+    <h1 class="disp" style="font-size:24px" data-i="auth.reg.t"></h1>
+    <p data-i="auth.reg.d"></p>
+
+    <div class="social">
+      <button class="btn-social" id="gBtn">
+        <svg class="ic"><use href="#i-google"/></svg>
+        <span data-i="auth.google"></span>
+      </button>
+      <button class="btn-social apple" id="aBtn">
+        <svg class="ic"><use href="#i-apple"/></svg>
+        <span data-i="auth.apple"></span>
+      </button>
+    </div>
+
+    <div class="or"><span data-i="auth.or"></span></div>
+
+    <form id="regForm" novalidate>
+      <div class="field" id="fName">
+        <label for="name" data-i="auth.name"></label>
+        <input id="name" type="text" autocomplete="name">
+        <p class="err" data-i="wiz.err.req"></p>
+      </div>
+      <div class="field" id="fEmail">
+        <label for="email" data-i="auth.email"></label>
+        <input id="email" type="email" autocomplete="email">
+        <p class="err" data-i="wiz.err.req"></p>
+      </div>
+      <div class="field" id="fPhone">
+        <label for="phone" data-i="auth.phone"></label>
+        <input id="phone" type="tel" autocomplete="tel" placeholder="+507 6000-0000">
+      </div>
+      <div class="field" id="fPass">
+        <label for="pass" data-i="auth.pass"></label>
+        <input id="pass" type="password" autocomplete="new-password">
+        <p class="err" data-i="wiz.err.req"></p>
+      </div>
+      <button class="btn btn-blue btn-block" style="margin-top:22px" type="submit">
+        <span data-i="auth.reg.b"></span>
+        <svg class="ic"><use href="#i-arrow"/></svg>
+      </button>
+    </form>
+
+    <p class="auth-alt">
+      <span data-i="auth.reg.alt"></span>
+      <a href="login.html" data-i="auth.reg.alt2"></a>
+    </p>
+    <p class="auth-terms" data-i="auth.terms"></p>
+  </div>
+</div>
+<p class="mini-credit"><span data-i="foot.credit"></span> <b>WOY Projects</b></p>
+
+<script src="shared.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const go = (name, email, provider, phone) => { vyLogin(name, email, provider, phone); vySeed(); location.href = "app.html"; };
+
+  document.getElementById("gBtn").addEventListener("click", () => go("Carlos", "carlos@gmail.com", "google"));
+  document.getElementById("aBtn").addEventListener("click", () => go("Carlos", "carlos@icloud.com", "apple"));
+
+  document.getElementById("regForm").addEventListener("submit", e => {
+    e.preventDefault();
+    let ok = true;
+    [["fName","name"],["fEmail","email"],["fPass","pass"]].forEach(([w,i]) => {
+      const bad = !document.getElementById(i).value.trim();
+      document.getElementById(w).classList.toggle("bad", bad);
+      if (bad) ok = false;
+    });
+    const email = document.getElementById("email").value.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      document.getElementById("fEmail").classList.add("bad"); ok = false;
+    }
+    if (!ok) return;
+    go(document.getElementById("name").value.trim(),
+       email, "email",
+       document.getElementById("phone").value.trim());
+  });
+});
+</script>
+</body>
+</html>

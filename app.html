@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mis autos — Véndelo Ya</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23005CFF'/><text x='50' y='68' font-size='52' font-family='Archivo,sans-serif' font-weight='800' fill='white' text-anchor='middle'>V</text></svg>">
+</head>
+<body class="app-page">
+
+<header class="hd">
+  <div class="wrap hd-in">
+    <a class="logo" href="index.html"><span class="slash">/</span>VÉNDELO<b>YA</b></a>
+    <nav>
+      <a href="app.html" style="color:var(--ink)" data-i="nav.misautos"></a>
+      <a href="app.html#perfil" data-i="nav.perfil"></a>
+      <a href="servicio.html" data-i="nav.servicio"></a>
+    </nav>
+    <div class="hd-right">
+      <div class="langs">
+        <button data-setlang="es">ES</button>
+        <button data-setlang="en">EN</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="outBtn" data-i="nav.salir"></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="view"></main>
+<p class="mini-credit"><span data-i="foot.credit"></span> <b>WOY Projects</b></p>
+
+<script src="shared.js"></script>
+<script>
+vyRequireAuth();
+
+const TRANS = { A: "wiz.trans.a", M: "wiz.trans.m" };
+const FUEL  = { G: "wiz.fuel.g", D: "wiz.fuel.d", H: "wiz.fuel.h", E: "wiz.fuel.e" };
+const L = (es, en) => vyLang() === "en" ? en : es;
+
+const chip = (icon, txt) =>
+  `<span class="chip"><svg class="ic"><use href="#${icon}"/></svg>${txt}</span>`;
+
+const chipsOf = c => [
+  `<span class="chip">${t(VY_BODY[c.body || "S"])}</span>`,
+  chip("i-gear", t(TRANS[c.trans])),
+  chip("i-road", vyKm(c.km)),
+  chip("i-cal", c.year),
+  chip("i-fuel", t(FUEL[c.fuel])),
+].join("");
+
+const badgeOf = c => {
+  const cls = c.stage >= 9 ? "done" : "";
+  const pulse = c.stage < 9 ? '<span class="dotp"></span>' : "";
+  return `<span class="stage-badge ${cls}">${pulse}${t("st." + c.stage)}</span>`;
+};
+
+/* ---------- Vistas ---------- */
+/* El cliente solo ve SUS autos. Coincidencia estricta por dueño: un auto sin
+   'owner' (dato incompleto) no se muestra a ningún cliente — nunca se filtran
+   publicaciones de otra persona. */
+const myCars = () => {
+  const u = vyUser();
+  if (!u) return [];
+  /* vínculo estable por ownerId; respaldo por nombre para autos antiguos sin id */
+  return vyCars().filter(c => (u.id && c.ownerId === u.id) || (!c.ownerId && c.owner === u.name));
+};
+
+function vList(){
+  const cars = myCars();
+  const u = vyUser();
+  const cards = cars.map(c => `
+    <button class="ccard" data-go="#auto=${c.id}">
+      <div class="ccard-img">${badgeOf(c)}${vyCarMedia(c)}</div>
+      <div class="ccard-b">
+        <h3>${esc(c.brand)} ${esc(c.model)} <span style="color:var(--ink-2);font-weight:500">· ${c.year}</span></h3>
+        <div class="chips">${chipsOf(c)}</div>
+        <div class="ccard-price">
+          <span>${t("app.precio")}</span>
+          <b>${vyMoney(c.price)}</b>
+        </div>
+      </div>
+    </button>`).join("");
+
+  const es = vyLang() === "es";
+  const kick = es ? "Tu panel · Panamá" : "Your dashboard · Panama";
+  const meta = cars.length
+    ? `<span class="app-head-meta"><span class="dot"></span>${cars.length} ${
+        cars.length === 1 ? (es ? "auto en seguimiento" : "car tracked")
+                          : (es ? "autos en seguimiento" : "cars tracked")}</span>`
+    : "";
+
+  return `
+    <div class="app-head">
+      <div>
+        <span class="kicker">${kick}</span>
+        <h1 class="disp">${t("app.hola")}, ${esc(u.name)}</h1>
+        <p>${t("app.sub")}</p>
+        ${meta}
+      </div>
+      <a class="btn btn-blue" href="#nuevo">
+        <svg class="ic"><use href="#i-plus"/></svg>
+        ${t("app.publicar")}
+      </a>
+    </div>
+    <div class="cars">
+      ${cards || `
+        <div class="empty">
+          <span class="badge-ic"><svg class="ic"><use href="#i-camera"/></svg></span>
+          <h3>${t("app.empty.t")}</h3>
+          <p>${t("app.empty.d")}</p>
+          <a class="btn btn-blue" href="#nuevo">${t("app.publicar")}</a>
+        </div>`}
+    </div>`;
+}
+
+function vDetail(id){
+  const c = myCars().find(x => x.id === id);
+  if (!c) { location.hash = ""; return ""; }
+
+  const citaTxt = c.cita
+    ? (vyLang() === "es" ? "Cita: " : "Appointment: ") + esc(c.cita.fecha) + ", " + esc(c.cita.hora) + " · " + esc(c.cita.taller)
+    : t("app.cita");
+  const tl = Array.from({length:9}, (_,i) => i+1).map(n => {
+    const cls = n < c.stage ? "done" : n === c.stage ? "now" : "future";
+    const icon = n < c.stage ? '<svg class="ic"><use href="#i-check"/></svg>' : "";
+    const meta = (n === 4 && c.stage >= 4)
+      ? `<span class="meta"><svg class="ic" style="width:13px;height:13px"><use href="#i-pin"/></svg>${citaTxt}</span>` : "";
+    return `<div class="tl-item ${cls}">
+      <span class="tl-dot">${icon}</span>
+      <h4>${t("st."+n)}</h4>
+      <p>${t("st."+n+"d")}</p>
+      ${meta}
+    </div>`;
+  }).join("");
+
+  const offer = c.stage >= 6 && c.offer
+    ? `<div class="of"><span>${t("app.oferta")}</span><b>${vyMoney(c.offer)}</b>
+        <small style="display:block; font-size:11.5px; color:var(--ink-2); margin-top:3px">${t("app.oferta.vig")}</small></div>` : "";
+
+  const debt = c.debt && c.debt.has
+    ? `<div class="debt-line"><svg class="ic"><use href="#i-bank"/></svg>
+        ${t("app.debe")}: <b>${esc(c.debt.bank)}</b> · ${vyMoney(c.debt.amount)}</div>` : "";
+
+  const report = c.stage >= 5
+    ? `<button class="btn btn-dark btn-block" style="margin-top:18px" id="repBtn">
+        <svg class="ic"><use href="#i-doc"/></svg>${t("app.reporte")}</button>`
+    : `<p class="demo-note"><svg class="ic" style="width:14px;height:14px"><use href="#i-clock"/></svg>${t("app.reporte.na")}</p>`;
+
+  const extras = c.extras
+    ? `<div class="extras-line"><svg class="ic"><use href="#i-note"/></svg>
+        <span><b>${t("app.extras")}:</b> ${esc(c.extras)}</span></div>` : "";
+
+  const acc = c.accident
+    ? `<div class="acc-line"><svg class="ic"><use href="#i-alert"/></svg>
+        <span><b>${t("app.acc")}</b>${c.accidentDesc ? " · " + esc(c.accidentDesc) : ""}</span></div>` : "";
+
+  const demo = c.demo
+    ? `<p class="demo-note"><svg class="ic" style="width:14px;height:14px"><use href="#i-doc"/></svg>
+        ${t("app.demo")} <button class="link-danger" data-del="${c.id}">${t("app.eliminar")}</button></p>` : "";
+
+  return `
+    <a class="back" href="#"><svg class="ic"><use href="#i-arrow"/></svg>${t("app.volver")}</a>
+    <div class="detail" style="margin-top:18px">
+      <div class="dcard">
+        <div class="ccard-img">${badgeOf(c)}${vyCarMedia(c)}</div>
+        <h2 style="font-size:24px; letter-spacing:-.02em">${esc(c.brand)} ${esc(c.model)}
+          <span style="color:var(--ink-2);font-weight:500">· ${c.year}</span></h2>
+        <div class="chips" style="margin-top:14px">${chipsOf(c)}
+          ${chip("i-camera", c.photos + " " + t("wiz.fotos.n"))}
+          ${c.videos ? chip("i-video", c.videos + " " + t("wiz.video.n")) : ""}
+        </div>
+        <p style="margin-top:12px"><span class="avail ${c.disp ? "" : "off"}">${t(c.disp ? "app.disp.si" : "app.disp.no")}</span></p>
+        <div class="dmoney">
+          <div><span>${t("app.precio")}</span><b>${vyMoney(c.price)}</b></div>
+          ${offer}
+        </div>
+        ${debt}
+        ${extras}
+        ${acc}
+        ${report}
+        ${demo}
+      </div>
+      <div>
+        <h3 class="disp" style="font-size:18px; margin-bottom:22px">${t("app.timeline")}</h3>
+        <div class="tl">${tl}</div>
+      </div>
+    </div>`;
+}
+
+/* ---------- Wizard ---------- */
+const WIZ_BLANK = () => ({ photos: 0, videos: 0, brand: "", model: "", year: "", km: "", trans: "A", fuel: "G", body: "S", color: "negro", extras: "", accident: false, accidentDesc: "", disp: true, price: "", debtHas: false, bank: "", amount: "" });
+const wiz = { step: 1, data: WIZ_BLANK() };
+
+function vWizard(){
+  const d = wiz.data;
+  const prog = [1,2,3,4].map(n => `<i class="${n <= wiz.step ? "on" : ""}"></i>`).join("");
+  let body = "";
+
+  if (wiz.step === 1) body = `
+    <p class="hint">${t("wiz.fotos.d")}</p>
+    <div class="upl">
+      <button id="addPh">
+        <svg class="ic"><use href="#i-camera"/></svg>
+        ${t("wiz.fotos.add")}
+        <span class="cnt">${d.photos} ${t("wiz.fotos.n")}</span>
+      </button>
+      <button id="addVd">
+        <svg class="ic"><use href="#i-video"/></svg>
+        ${t("wiz.video.add")}
+        <span class="cnt">${d.videos} ${t("wiz.video.n")}</span>
+      </button>
+    </div>`;
+
+  if (wiz.step === 2) body = `
+    <div class="field" id="fBrand">
+      <label>${t("wiz.marca")}</label>
+      <select id="brand">
+        <option value="">${t("wiz.marca.ph")}</option>
+        ${VY_BRANDS.map(b => `<option ${d.brand === b ? "selected" : ""}>${b}</option>`).join("")}
+      </select>
+      <p class="err">${t("wiz.err.req")}</p>
+    </div>
+    <div class="field" id="fModel">
+      <label>${t("wiz.modelo")}</label>
+      <input id="model" type="text" placeholder="${t("wiz.modelo.ph")}" value="${esc(d.model)}">
+      <p class="err">${t("wiz.err.req")}</p>
+    </div>
+    <div class="grid2">
+      <div class="field" id="fYear">
+        <label>${t("wiz.anio")}</label>
+        <input id="year" type="number" min="1990" max="2027" placeholder="2021" value="${d.year}">
+        <p class="err">${t("wiz.err.req")}</p>
+      </div>
+      <div class="field" id="fKm">
+        <label>${t("wiz.km")}</label>
+        <input id="km" type="number" min="0" placeholder="45000" value="${d.km}">
+        <p class="err">${t("wiz.err.req")}</p>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label>${t("wiz.trans")}</label>
+        <div class="seg" data-seg="trans">
+          <button type="button" data-v="A" class="${d.trans === "A" ? "on" : ""}">${t("wiz.trans.a")}</button>
+          <button type="button" data-v="M" class="${d.trans === "M" ? "on" : ""}">${t("wiz.trans.m")}</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>${t("wiz.fuel")}</label>
+        <div class="seg" data-seg="fuel">
+          <button type="button" data-v="G" class="${d.fuel === "G" ? "on" : ""}">${t("wiz.fuel.g")}</button>
+          <button type="button" data-v="D" class="${d.fuel === "D" ? "on" : ""}">${t("wiz.fuel.d")}</button>
+          <button type="button" data-v="H" class="${d.fuel === "H" ? "on" : ""}">${t("wiz.fuel.h")}</button>
+          <button type="button" data-v="E" class="${d.fuel === "E" ? "on" : ""}">${t("wiz.fuel.e")}</button>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>${t("wiz.body")}</label>
+      <select id="body">
+        ${Object.keys(VY_BODY).map(k => `<option value="${k}" ${d.body === k ? "selected" : ""}>${t(VY_BODY[k])}</option>`).join("")}
+      </select>
+    </div>
+    <div class="field">
+      <label>${t("wiz.color")}</label>
+      <div class="swatches">
+        ${Object.entries(VY_COLORS).map(([k, hex]) => `
+          <button type="button" data-color="${k}" data-c="${k}" class="${d.color === k ? "on" : ""}"
+            style="background:${hex}" title="${k}"></button>`).join("")}
+      </div>
+    </div>
+    <div class="field">
+      <label>${t("wiz.extras")}</label>
+      <p class="hint" style="margin:2px 0 8px">${t("wiz.extras.d")}</p>
+      <textarea id="extras" rows="3" placeholder="${t("wiz.extras.ph")}">${esc(d.extras)}</textarea>
+    </div>
+    <div class="field">
+      <label>${t("wiz.acc")}</label>
+      <div class="seg" data-seg="acc">
+        <button type="button" data-v="no" class="${!d.accident ? "on" : ""}">${t("wiz.acc.no")}</button>
+        <button type="button" data-v="si" class="${d.accident ? "on" : ""}">${t("wiz.acc.si")}</button>
+      </div>
+    </div>
+    <div class="field" id="accField" style="display:${d.accident ? "block" : "none"}">
+      <label>${t("wiz.acc.desc")}</label>
+      <textarea id="accDesc" rows="2" placeholder="${t("wiz.acc.ph")}">${esc(d.accidentDesc)}</textarea>
+    </div>`;
+
+  if (wiz.step === 3){
+    const val = vyValuacion(d.year, d.km);
+    body = `
+    <div class="field" id="fPrice">
+      <label style="font-size:16px">${t("wiz.precio")}</label>
+      <p class="hint" style="margin:2px 0 10px">${t("wiz.precio.d")}</p>
+      <input id="price" type="number" min="500" placeholder="US$ 15,000"
+        style="font-size:24px; font-weight:700; padding:16px 18px" value="${d.price}">
+      <p class="hint" style="margin-top:10px; display:flex; align-items:center; gap:8px">
+        <svg class="ic" style="width:15px;height:15px;color:var(--blue)"><use href="#i-doc"/></svg>
+        ${t("wiz.val")}: <b style="color:var(--ink)">${vyMoney(val.min)} – ${vyMoney(val.max)}</b>
+      </p>
+      <p class="err">${t("wiz.err.req")}</p>
+    </div>
+    <div class="field">
+      <label>${t("wiz.disp")}</label>
+      <p class="hint" style="margin:2px 0 8px">${t("wiz.disp.d")}</p>
+      <div class="seg" data-seg="disp">
+        <button type="button" data-v="si" class="${d.disp ? "on" : ""}">${t("wiz.disp.si")}</button>
+        <button type="button" data-v="no" class="${!d.disp ? "on" : ""}">${t("wiz.disp.no")}</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>${t("wiz.debe")}</label>
+      <div class="seg" data-seg="debt">
+        <button type="button" data-v="no" class="${!d.debtHas ? "on" : ""}">${t("wiz.debe.no")}</button>
+        <button type="button" data-v="si" class="${d.debtHas ? "on" : ""}">${t("wiz.debe.si")}</button>
+      </div>
+    </div>
+    <div class="grid2" id="debtFields" style="display:${d.debtHas ? "grid" : "none"}">
+      <div class="field" id="fBank">
+        <label>${t("wiz.banco")}</label>
+        <input id="bank" type="text" placeholder="${t("wiz.banco.ph")}" value="${esc(d.bank)}">
+        <p class="err">${t("wiz.err.req")}</p>
+      </div>
+      <div class="field" id="fAmount">
+        <label>${t("wiz.monto")}</label>
+        <input id="amount" type="number" min="0" placeholder="4,300" value="${d.amount}">
+        <p class="err">${t("wiz.err.req")}</p>
+      </div>
+    </div>`;
+  }
+
+  if (wiz.step === 4) body = `
+    <div class="checks">
+      ${[1,2,3,4,5].map(n => `
+        <label><input type="checkbox" class="leg"> <span>${t("wiz.leg"+n)}</span></label>`).join("")}
+    </div>`;
+
+  return `
+    <div class="wiz">
+      <a class="back" href="#"><svg class="ic"><use href="#i-arrow"/></svg>${t("app.volver")}</a>
+      <div class="wiz-card" style="margin-top:16px">
+        <div class="wiz-prog">${prog}</div>
+        <span class="wiz-step-label">${wiz.step} / 4</span>
+        <h2>${t("wiz.p" + wiz.step)}</h2>
+        ${body}
+        <p class="wiz-err" id="wizErr"></p>
+        <div class="wiz-nav">
+          ${wiz.step > 1 ? `<button class="btn btn-ghost" id="wBack">${t("wiz.atras")}</button>` : ""}
+          <button class="btn btn-blue" id="wNext">
+            ${wiz.step === 4 ? t("wiz.enviar") : t("wiz.sig")}
+            <svg class="ic"><use href="#i-arrow"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function vDone(id){
+  return `
+    <div class="wiz">
+      <div class="wiz-card done-card">
+        <span class="badge-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+        <h2 class="disp">${t("wiz.ok.t")}</h2>
+        <p>${t("wiz.ok.d")}</p>
+        <a class="btn btn-blue btn-lg" href="#auto=${id}">
+          ${t("wiz.ok.b")}
+          <svg class="ic"><use href="#i-arrow"/></svg>
+        </a>
+      </div>
+    </div>`;
+}
+
+/* ---------- Router + eventos ---------- */
+function grab(){
+  const d = wiz.data;
+  const g = id => document.getElementById(id);
+  if (wiz.step === 2){
+    if (g("brand")) d.brand = g("brand").value;
+    if (g("model")) d.model = g("model").value.trim();
+    if (g("year")) d.year = g("year").value;
+    if (g("km")) d.km = g("km").value;
+    if (g("body")) d.body = g("body").value;
+    if (g("extras")) d.extras = g("extras").value;
+    if (g("accDesc")) d.accidentDesc = g("accDesc").value;
+  }
+  if (wiz.step === 3){
+    if (g("price")) d.price = g("price").value;
+    if (g("bank")) d.bank = g("bank").value.trim();
+    if (g("amount")) d.amount = g("amount").value;
+  }
+}
+
+function validate(){
+  const d = wiz.data;
+  const err = document.getElementById("wizErr");
+  const bad = (w, cond) => { const el = document.getElementById(w); if (el) el.classList.toggle("bad", cond); return cond; };
+  err.classList.remove("show");
+
+  if (wiz.step === 1 && d.photos < 3){ err.textContent = t("wiz.err.fotos"); err.classList.add("show"); return false; }
+  if (wiz.step === 2){
+    let any = false;
+    any = bad("fBrand", !d.brand) || any;
+    any = bad("fModel", !d.model) || any;
+    any = bad("fYear", !d.year) || any;
+    any = bad("fKm", !d.km) || any;
+    if (d.accident) any = bad("accDesc", !(d.accidentDesc || "").trim()) || any;
+    if (any){ err.textContent = t("wiz.err.req"); err.classList.add("show"); return false; }
+  }
+  if (wiz.step === 3){
+    let any = bad("fPrice", !d.price);
+    if (d.debtHas){
+      any = bad("fBank", !d.bank) || any;
+      any = bad("fAmount", !d.amount) || any;
+    }
+    if (any){ err.textContent = t("wiz.err.req"); err.classList.add("show"); return false; }
+  }
+  if (wiz.step === 4){
+    const all = [...document.querySelectorAll(".leg")].every(c => c.checked);
+    if (!all){ err.textContent = t("wiz.err.leg"); err.classList.add("show"); return false; }
+  }
+  return true;
+}
+
+function publish(){
+  const d = wiz.data;
+  const id = "car-" + Math.random().toString(36).slice(2, 8);
+  const cars = vyCars();
+  const u = vyUser();
+  cars.unshift({
+    id, ownerId: u.id, owner: u.name, ownerPhone: u.phone || "+507 6123-4567", ownerEmail: u.email,
+    brand: d.brand, model: d.model, year: +d.year, km: +d.km,
+    trans: d.trans, fuel: d.fuel, body: d.body, color: d.color, disp: d.disp,
+    extras: d.extras.trim(), accident: d.accident, accidentDesc: d.accident ? d.accidentDesc.trim() : "",
+    price: +d.price,
+    debt: { has: d.debtHas, bank: d.bank, amount: +d.amount || 0 },
+    photos: d.photos, videos: d.videos, stage: 1, created: Date.now()
+  });
+  vySaveCars(cars);
+  wiz.step = 1;
+  wiz.data = WIZ_BLANK();
+  return id;
+}
+
+/* Perfil del cliente — editable (nombre, correo, teléfono, foto) */
+function vPerfilCliente(){
+  const u = vyUser() || {};
+  const n = myCars().length;
+  const face = u.photo ? `<img src="${esc(u.photo)}" alt="${esc(u.name)}">` : vyInitials(u.name);
+  return `
+    <a class="back" href="#"><svg class="ic"><use href="#i-arrow"/></svg>${esc(t("nav.misautos"))}</a>
+    <div class="prof-head">
+      <span class="prof-face">${face}
+        <label class="prof-cam" title="${esc(L("Cambiar foto", "Change photo"))}"><svg class="ic"><use href="#i-camera"/></svg><input type="file" id="pfPhoto" accept="image/png,image/jpeg,image/webp" hidden></label>
+      </span>
+      <div><h1 class="disp">${esc(u.name || L("Mi perfil", "My profile"))}</h1><p class="muted">${esc(u.email || "")}</p></div>
+    </div>
+    <div class="prof-card">
+      <div class="field"><label>${esc(L("Nombre completo", "Full name"))}</label><input id="cpName" value="${esc(u.name || "")}"></div>
+      <div class="field" style="margin-top:12px"><label>${esc(L("Correo", "Email"))}</label><input id="cpMail" type="email" value="${esc(u.email || "")}"></div>
+      <div class="field" style="margin-top:12px"><label>${esc(L("Teléfono", "Phone"))}</label><input id="cpPhone" value="${esc(u.phone || "")}" placeholder="+507 6000-0000"></div>
+      <button class="btn btn-dark btn-block" style="margin-top:18px" id="cpSave">${esc(L("Guardar cambios", "Save changes"))}</button>
+      <p class="muted" style="margin-top:12px;font-size:13px">${esc(L("Tus datos se usan solo para gestionar tu venta.", "Your data is used only to manage your sale."))} ${n} ${esc(L(n === 1 ? "auto publicado" : "autos publicados", n === 1 ? "car published" : "cars published"))}.</p>
+    </div>`;
+}
+
+/* Descarga real del reporte del revisado (archivo de texto generado) */
+function downloadRevisadoReport(c){
+  const lines = [
+    "VÉNDELO YA — " + L("Reporte del revisado", "Inspection report"),
+    "========================================",
+    L("Vehículo", "Vehicle") + ": " + [c.brand, c.model, c.year].join(" "),
+    L("Kilometraje", "Mileage") + ": " + vyKm(c.km),
+    L("Propietario", "Owner") + ": " + (c.owner || ""),
+    L("Etapa actual", "Current stage") + ": " + c.stage + "/9",
+    c.cita ? (L("Cita", "Appointment") + ": " + c.cita.fecha + " " + c.cita.hora + " · " + c.cita.taller) : "",
+    "",
+    L("Reporte de demostración generado por la plataforma.", "Demo report generated by the platform."),
+    L("En producción incluiría el PDF firmado del taller con hallazgos y fotos.", "In production it would include the garage's signed PDF with findings and photos.")
+  ].filter(Boolean);
+  const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "revisado-" + (c.brand || "auto") + "-" + (c.model || "").replace(/\s+/g, "") + ".txt";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+let doneId = null;
+
+function render(){
+  const u = vyUser();
+  if (!u) return; /* sin sesión: vyRequireAuth ya redirige; no renderizar con user null */
+  const h = location.hash;
+  const view = document.getElementById("view");
+  document.body.classList.toggle("wiz-back", h === "#nuevo" || h.startsWith("#ok"));
+
+  if (h === "#nuevo") view.innerHTML = vWizard();
+  else if (h.startsWith("#ok") && doneId) view.innerHTML = vDone(doneId);
+  else if (h === "#perfil") view.innerHTML = vPerfilCliente();
+  else if (h.startsWith("#auto=")) view.innerHTML = vDetail(h.slice(6));
+  else view.innerHTML = vList();
+
+  bind();
+}
+
+function bind(){
+  document.querySelectorAll("[data-go]").forEach(el =>
+    el.addEventListener("click", () => location.hash = el.dataset.go));
+
+  document.querySelectorAll("[data-del]").forEach(el =>
+    el.addEventListener("click", e => {
+      e.stopPropagation();
+      vySaveCars(vyCars().filter(c => c.id !== el.dataset.del));
+      location.hash = "";
+      render();
+    }));
+
+  const rep = document.getElementById("repBtn");
+  if (rep) rep.addEventListener("click", () => {
+    const id = location.hash.startsWith("#auto=") ? location.hash.slice(6) : null;
+    const c = vyCars().find(x => x.id === id);
+    if (c) downloadRevisadoReport(c);
+  });
+
+  /* Perfil del cliente: guardar datos + cambiar foto */
+  const cpSave = document.getElementById("cpSave");
+  if (cpSave) cpSave.addEventListener("click", () => {
+    const name = document.getElementById("cpName").value.trim();
+    const email = document.getElementById("cpMail").value.trim();
+    const phone = document.getElementById("cpPhone").value.trim();
+    if (!name){ alert(L("El nombre no puede quedar vacío.", "Name can't be empty.")); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ alert(L("Correo inválido.", "Invalid email.")); return; }
+    vyUpdateCurrentUser({ name, email, phone });
+    alert(L("Datos actualizados.", "Profile updated."));
+    render();
+  });
+  const pfPhoto = document.getElementById("pfPhoto");
+  if (pfPhoto) pfPhoto.addEventListener("change", () => {
+    const f = pfPhoto.files && pfPhoto.files[0]; if (!f) return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(f.type)){ alert(L("Sube una imagen (PNG, JPG, WebP).", "Upload an image (PNG, JPG, WebP).")); pfPhoto.value = ""; return; }
+    if (f.size > 4 * 1024 * 1024){ alert(L("La imagen supera 4 MB.", "Image exceeds 4 MB.")); pfPhoto.value = ""; return; }
+    const r = new FileReader();
+    r.onload = () => {
+      if (!/^data:image\//.test(r.result)) return;
+      vyUpdateCurrentUser({ photo: r.result });
+      render();
+    };
+    r.readAsDataURL(f);
+  });
+
+  /* wizard */
+  const next = document.getElementById("wNext");
+  if (next){
+    const back = document.getElementById("wBack");
+    if (back) back.addEventListener("click", () => { grab(); wiz.step--; render(); });
+
+    next.addEventListener("click", () => {
+      grab();
+      if (!validate()) return;
+      if (wiz.step < 4){ wiz.step++; render(); }
+      else { doneId = publish(); location.hash = "#ok"; }
+    });
+
+    const addPh = document.getElementById("addPh");
+    if (addPh) addPh.addEventListener("click", () => { wiz.data.photos += 2; render(); });
+    const addVd = document.getElementById("addVd");
+    if (addVd) addVd.addEventListener("click", () => { wiz.data.videos += 1; render(); });
+
+    document.querySelectorAll("[data-seg]").forEach(seg => {
+      seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+        grab();
+        const k = seg.dataset.seg;
+        if (k === "debt") wiz.data.debtHas = b.dataset.v === "si";
+        else if (k === "disp") wiz.data.disp = b.dataset.v === "si";
+        else if (k === "acc") wiz.data.accident = b.dataset.v === "si";
+        else wiz.data[k] = b.dataset.v;
+        render();
+      }));
+    });
+
+    document.querySelectorAll("[data-color]").forEach(b =>
+      b.addEventListener("click", () => { grab(); wiz.data.color = b.dataset.color; render(); }));
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("outBtn").addEventListener("click", vyLogout);
+  document.addEventListener("vy:lang", render);
+  window.addEventListener("hashchange", () => {
+    /* al entrar al wizard desde fuera, empezar siempre en blanco (no reusar
+       datos de una publicación abandonada) */
+    if (location.hash === "#nuevo"){ wiz.step = 1; wiz.data = WIZ_BLANK(); }
+    /* la confirmación de publicación es de un solo uso: al salir de #ok se
+       descarta, para no re-mostrar un "¡Auto publicado!" viejo al volver atrás */
+    if (!location.hash.startsWith("#ok")) doneId = null;
+    render();
+  });
+  /* tiempo real demo: si el admin cambia una etapa en otra pestaña, se refleja aquí */
+  window.addEventListener("storage", e => { if (e.key === "vy_cars") render(); });
+  render();
+});
+</script>
+</body>
+</html>

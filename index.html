@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Véndelo Ya — Vende tu auto sin vueltas | Panamá</title>
+<meta name="description" content="Publica tu auto, lo revisamos, te hacemos una oferta y el pago se libera con el traspaso legal. Compra directa de autos en Panamá.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23005CFF'/><text x='50' y='68' font-size='52' font-family='Archivo,sans-serif' font-weight='800' fill='white' text-anchor='middle'>V</text></svg>">
+</head>
+<body>
+
+<header class="hd hd-transparent">
+  <div class="wrap hd-in">
+    <a class="logo" href="index.html"><span class="slash">/</span>VÉNDELO<b>YA</b></a>
+    <nav>
+      <a href="#proceso" data-i="nav.servicio"></a>
+      <a href="#faq" data-i="nav.faq"></a>
+      <a href="#contacto" data-i="nav.contacto"></a>
+    </nav>
+    <div class="hd-right">
+      <div class="langs">
+        <button data-setlang="es">ES</button>
+        <button data-setlang="en">EN</button>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="login.html" data-i="nav.entrar"></a>
+      <a class="btn btn-blue btn-sm" href="registro.html" data-i="nav.vender"></a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO + MARCAS: juntos ocupan la pantalla completa (100dvh) -->
+<div class="hero-fold">
+<section class="hero">
+  <video class="hero-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+    <source src="hero.mp4" type="video/mp4">
+  </video>
+  <div class="hero-shade" aria-hidden="true"></div>
+  <div class="hero-atmos" aria-hidden="true">
+    <span class="hero-glow"></span>
+    <span class="hero-glow two"></span>
+    <span class="hero-floor"></span>
+    <span class="hero-grain"></span>
+  </div>
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="kicker rev in" data-i="hero.kicker"></span>
+        <h1 class="disp rev in d1" style="margin-top:18px">
+          <span data-i="hero.t1"></span><br>
+          <span class="blue" data-i="hero.t2"></span>
+        </h1>
+        <p class="hero-sub rev in d2" data-i="hero.sub"></p>
+        <div class="hero-ctas rev in d3">
+          <a class="btn btn-blue btn-lg" href="registro.html">
+            <span data-i="hero.cta"></span>
+            <svg class="ic"><use href="#i-arrow"/></svg>
+          </a>
+          <a class="btn btn-ghost btn-lg" href="servicio.html" data-i="hero.cta2"></a>
+        </div>
+        <p class="hero-note rev in d4">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span data-i="hero.note"></span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE MARCAS -->
+<div class="marquee">
+  <p class="marquee-label" data-i="marcas.label"></p>
+  <div class="marquee-track" id="mq"></div>
+</div>
+</div><!-- /hero-fold -->
+
+<!-- PASOS -->
+<section class="blk" id="proceso">
+  <div class="wrap">
+    <div class="blk-head rev">
+      <span class="kicker" data-i="steps.kicker"></span>
+      <h2 class="disp" data-i="steps.title"></h2>
+    </div>
+    <div class="steps">
+      <article class="step rev">
+        <span class="n">01</span>
+        <h3 data-i="steps.s1t"></h3>
+        <p data-i="steps.s1d"></p>
+      </article>
+      <article class="step rev d1">
+        <span class="n">02</span>
+        <h3 data-i="steps.s2t"></h3>
+        <p data-i="steps.s2d"></p>
+      </article>
+      <article class="step rev d2">
+        <span class="n">03</span>
+        <h3 data-i="steps.s3t"></h3>
+        <p data-i="steps.s3d"></p>
+      </article>
+      <article class="step rev d3">
+        <span class="n">04</span>
+        <h3 data-i="steps.s4t"></h3>
+        <p data-i="steps.s4d"></p>
+      </article>
+    </div>
+    <div class="steps-note rev">
+      <svg class="ic"><use href="#i-clock"/></svg>
+      <span data-i="steps.follow"></span>
+    </div>
+    <div class="cta-band rev">
+      <p class="cta-band-t" data-i="cta.ready"></p>
+      <a class="btn btn-blue btn-lg cta-glow" href="registro.html">
+        <span data-i="nav.vender"></span>
+        <svg class="ic"><use href="#i-arrow"/></svg>
+      </a>
+      <p class="cta-band-note"><svg class="ic"><use href="#i-check"/></svg><span data-i="cta.trust"></span></p>
+    </div>
+  </div>
+</section>
+
+<!-- REVISADO $60 -->
+<section class="revisado-banner" id="revisado">
+  <video class="rb-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+    <source src="revisado.mp4" type="video/mp4">
+  </video>
+  <div class="rb-shade" aria-hidden="true"></div>
+  <div class="wrap rb-wrap">
+    <div class="rb-card rev in">
+      <span class="kicker" data-i="sixty.kicker"></span>
+      <h2 class="disp" data-i="sixty.title"></h2>
+      <p class="rb-lead" data-i="sixty.d"></p>
+      <div class="rb-points">
+        <div class="rb-point">
+          <span class="rb-ic ok"><svg class="ic"><use href="#i-check"/></svg></span>
+          <div>
+            <h3 data-i="sixty.c1t"></h3>
+            <p data-i="sixty.c1d"></p>
+          </div>
+        </div>
+        <div class="rb-point">
+          <span class="rb-ic"><svg class="ic"><use href="#i-doc"/></svg></span>
+          <div>
+            <h3 data-i="sixty.c2t"></h3>
+            <p data-i="sixty.c2d"></p>
+          </div>
+        </div>
+      </div>
+      <p class="rb-note">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span data-i="sixty.note"></span>
+      </p>
+      <a class="btn btn-blue btn-block cta-glow rb-cta" href="registro.html">
+        <span data-i="cta.rev"></span>
+        <svg class="ic"><use href="#i-arrow"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- LEGAL -->
+<section class="blk" id="legal">
+  <div class="wrap">
+    <div class="blk-head rev">
+      <span class="kicker" data-i="legal.kicker"></span>
+      <h2 class="disp" data-i="legal.title"></h2>
+      <p data-i="legal.d"></p>
+    </div>
+    <div class="legal-grid">
+      <article class="lcard rev">
+        <span class="badge-ic"><svg class="ic"><use href="#i-user"/></svg></span>
+        <h3 data-i="legal.l1t"></h3>
+        <p data-i="legal.l1d"></p>
+      </article>
+      <article class="lcard rev d1">
+        <span class="badge-ic"><svg class="ic"><use href="#i-doc"/></svg></span>
+        <h3 data-i="legal.l2t"></h3>
+        <p data-i="legal.l2d"></p>
+      </article>
+      <article class="lcard rev d2">
+        <span class="badge-ic"><svg class="ic"><use href="#i-bank"/></svg></span>
+        <h3 data-i="legal.l3t"></h3>
+        <p data-i="legal.l3d"></p>
+      </article>
+      <article class="lcard rev d3">
+        <span class="badge-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+        <h3 data-i="legal.l4t"></h3>
+        <p data-i="legal.l4d"></p>
+      </article>
+    </div>
+    <div class="legal-pay rev">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span data-i="legal.pay"></span>
+    </div>
+    <div class="cta-band rev">
+      <p class="cta-band-t" data-i="cta.ready2"></p>
+      <a class="btn btn-blue btn-lg cta-glow" href="registro.html">
+        <span data-i="nav.vender"></span>
+        <svg class="ic"><use href="#i-arrow"/></svg>
+      </a>
+      <p class="cta-band-note"><svg class="ic"><use href="#i-check"/></svg><span data-i="cta.trust"></span></p>
+    </div>
+  </div>
+</section>
+
+<!-- TIMELINE PREVIEW — fondo de video con efecto ventana (fondo fijo) -->
+<section class="blk tl-reveal" id="timeline">
+  <div class="tl-bgwrap" aria-hidden="true">
+    <video class="tl-bg" autoplay muted loop playsinline preload="auto">
+      <source src="timeline-bg.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="tl-shade" aria-hidden="true"></div>
+  <div class="wrap tl-content">
+    <div class="blk-head rev tl-head">
+      <span class="kicker" data-i="time.kicker"></span>
+      <h2 class="disp" data-i="time.title"></h2>
+      <p data-i="time.d"></p>
+    </div>
+    <div class="tl-bottom">
+      <div class="tl tl-h rev d1" id="tlDemo"></div>
+      <div class="tl-cta">
+        <a class="btn btn-blue btn-lg cta-glow" href="registro.html">
+          <span data-i="nav.vender"></span>
+          <svg class="ic"><use href="#i-arrow"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="blk" id="faq">
+  <div class="wrap">
+    <div class="blk-head rev">
+      <span class="kicker" data-i="faq.kicker"></span>
+      <h2 class="disp" data-i="faq.title"></h2>
+    </div>
+    <div class="faq rev">
+      <details open>
+        <summary data-i="faq.q1"></summary>
+        <p data-i="faq.a1"></p>
+      </details>
+      <details>
+        <summary data-i="faq.q2"></summary>
+        <p data-i="faq.a2"></p>
+      </details>
+      <details>
+        <summary data-i="faq.q3"></summary>
+        <p data-i="faq.a3"></p>
+      </details>
+      <details>
+        <summary data-i="faq.q4"></summary>
+        <p data-i="faq.a4"></p>
+      </details>
+      <details>
+        <summary data-i="faq.q5"></summary>
+        <p data-i="faq.a5"></p>
+      </details>
+    </div>
+    <div class="cta-band rev">
+      <p class="cta-band-t" data-i="cta.doubt"></p>
+      <a class="btn btn-blue btn-lg cta-glow" href="registro.html">
+        <span data-i="nav.vender"></span>
+        <svg class="ic"><use href="#i-arrow"/></svg>
+      </a>
+      <p class="cta-band-note"><svg class="ic"><use href="#i-check"/></svg><span data-i="cta.trust"></span></p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="blk" style="padding-top:0" id="contacto">
+  <div class="wrap">
+    <div class="cta rev">
+      <h2 class="disp"><span data-i="cta.title"></span></h2>
+      <p data-i="cta.d"></p>
+      <a class="btn btn-blue btn-lg" href="registro.html">
+        <span data-i="cta.b"></span>
+        <svg class="ic"><use href="#i-arrow"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="logo" href="index.html"><span class="slash">/</span>VÉNDELO<b>YA</b></a>
+      <p class="foot-tag" data-i="foot.tag"></p>
+    </div>
+    <div class="foot-links">
+      <a href="aviso-legal.html" data-i="foot.legal"></a>
+      <a href="terminos.html" data-i="foot.terms"></a>
+      <a href="privacidad.html" data-i="foot.priv"></a>
+      <a href="admin.html">Empresa</a>
+      <span>© 2026 Véndelo Ya · Panamá</span>
+    </div>
+  </div>
+  <div class="wrap"><p class="foot-credit"><span data-i="foot.credit"></span> <b>WOY Projects</b></p></div>
+</footer>
+
+<!-- CTA fijo en móvil: aparece al pasar la portada -->
+<a class="cta-sticky" href="registro.html" id="ctaSticky">
+  <span data-i="nav.vender"></span>
+  <svg class="ic"><use href="#i-arrow"/></svg>
+</a>
+
+<script src="shared.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  /* videos (portada + revisado): garantizar reproducción en loop aunque el
+     navegador ignore el autoplay (muteado siempre puede reproducirse por script) */
+  const vids = [...document.querySelectorAll(".hero-video, .rb-video, .tl-bg")];
+  const playVids = () => vids.forEach(v => { v.muted = true; const p = v.play(); if (p && p.catch) p.catch(() => {}); });
+  if (vids.length){
+    playVids();
+    /* si una política bloquea el autoplay, reintenta al primer gesto del usuario */
+    document.addEventListener("pointerdown", playVids, { once: true });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) playVids(); });
+  }
+
+  /* header: transparente sobre el hero, sólido al hacer scroll */
+  const hd = document.querySelector(".hd-transparent");
+  if (hd){
+    const onScroll = () => hd.classList.toggle("scrolled", window.scrollY > 40);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive:true });
+  }
+
+  /* CTA fijo en móvil: aparece al dejar atrás la portada, se oculta en el CTA final
+     (para no tapar el botón principal de esa sección) */
+  const sticky = document.getElementById("ctaSticky");
+  if (sticky){
+    const fold = document.querySelector(".hero-fold");
+    const last = document.getElementById("contacto");
+    const onCta = () => {
+      const past = window.scrollY > (fold ? fold.offsetHeight * .85 : 500);
+      const atEnd = last && last.getBoundingClientRect().top < window.innerHeight;
+      sticky.classList.toggle("show", past && !atEnd);
+    };
+    onCta();
+    window.addEventListener("scroll", onCta, { passive:true });
+    window.addEventListener("resize", onCta);
+  }
+
+  /* marquee de marcas (duplicado para loop continuo) */
+  const list = VY_BRANDS.filter(b => b !== "Otro");
+  const seq = list.map((b,i) => i % 4 === 3 ? `<b>${b}</b>` : `<span>${b}</span>`).join("");
+  document.getElementById("mq").innerHTML = seq + seq;
+
+  /* timeline demo (etapa activa: revisado realizado) */
+  function renderTl(){
+    const now = 5;
+    document.getElementById("tlDemo").innerHTML =
+      Array.from({length:9}, (_,i) => i+1).map(n => {
+        const cls = n < now ? "done" : n === now ? "now" : "future";
+        const icon = n < now ? '<svg class="ic"><use href="#i-check"/></svg>' : "";
+        const meta = n === 4 ? `<span class="meta"><svg class="ic" style="width:13px;height:13px"><use href="#i-pin"/></svg>${t("app.cita")}</span>` : "";
+        return `<div class="tl-item ${cls}">
+          <span class="tl-dot">${icon}</span>
+          <h4>${t("st."+n)}</h4>
+          <p>${t("st."+n+"d")}</p>
+          ${meta}
+        </div>`;
+      }).join("");
+  }
+  renderTl();
+  document.addEventListener("vy:lang", renderTl);
+});
+</script>
+</body>
+</html>
